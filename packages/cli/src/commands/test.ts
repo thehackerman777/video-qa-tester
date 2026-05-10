@@ -2,7 +2,7 @@
 // CLI: Test Command
 // ============================================================
 
-import { quickTest, DEFAULT_SCENARIOS, createTestEngine, TestResult, MetricsCollector } from '@videoqa/core';
+import { quickTest, DEFAULT_SCENARIOS, createTestEngine, TestResult, MetricsCollector, TestScenario } from '@videoqa/core';
 import chalk from 'chalk';
 import ora from 'ora';
 import Table from 'cli-table3';
@@ -56,10 +56,28 @@ export async function runTestCommand(
       const page = await context.newPage();
       const runner = new engine.runner(page, scenario.name, 'cli');
 
+      // Adapt scenario: replace placeholders with actual video URL
+      const adaptedScenario: TestScenario = {
+        ...scenario,
+        actions: scenario.actions.map((action) => {
+          if (action.type === 'navigate') {
+            let url = action.params.url as string;
+            if (url?.includes('{{VIDEO_URL}}')) {
+              url = url.replace('{{VIDEO_URL}}', videoUrl);
+            }
+            if (url?.includes('{{PLATFORM_URL}}')) {
+              url = url.replace('{{PLATFORM_URL}}', new URL(videoUrl).origin);
+            }
+            return { ...action, params: { url } };
+          }
+          return action;
+        }),
+      };
+
       spinner.succeed('Test environment ready');
 
       const progressSpinner = ora('Executing actions...').start();
-      const result = await runner.execute(scenario);
+      const result = await runner.execute(adaptedScenario);
       progressSpinner.succeed(`Test completed: ${result.status}`);
 
       // Collect metrics
