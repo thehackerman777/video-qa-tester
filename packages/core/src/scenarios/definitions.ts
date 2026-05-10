@@ -187,7 +187,31 @@ export const subscribeJourneyScenario: TestScenario = {
 };
 
 /**
- * Scenario 7: Quick Load Test
+ * Scenario 7: View Counting Test
+ * Designed specifically to trigger YouTube view counting.
+ * Waits ~35s which is the minimum for YouTube to register a view.
+ */
+export const viewCountingScenario: TestScenario = {
+  id: 'view-count',
+  name: 'View Counting Test',
+  description: 'Navigates to video, plays for 35s+ to trigger view counting',
+  category: 'playback',
+  weight: 100,
+  actions: [
+    { type: 'navigate', params: { url: '{{VIDEO_URL}}' }, delayMs: 1000, timeoutMs: 20000 },
+    { type: 'wait', params: { ms: 5000 } },
+    { type: 'play', params: {}, delayMs: 1000, timeoutMs: 10000 },
+    { type: 'wait', params: { ms: 35000 } },  // 35s = YouTube view threshold
+    { type: 'pause', params: {}, delayMs: 1000 },
+    { type: 'wait', params: { ms: 2000 } },
+  ],
+  expectedOutcomes: [
+    { metric: 'current_time', operator: 'gt', expectedValue: 30 },
+  ],
+};
+
+/**
+ * Scenario 8: Quick Load Test
  * Minimal scenario for load testing — fast execution.
  */
 export const quickLoadScenario: TestScenario = {
@@ -195,11 +219,11 @@ export const quickLoadScenario: TestScenario = {
   name: 'Quick Load Test',
   description: 'Fast scenario designed for load testing with minimal delays',
   category: 'load',
-  weight: 100,
+  weight: 50,
   actions: [
     { type: 'navigate', params: { url: '{{VIDEO_URL}}' }, delayMs: 500, timeoutMs: 15000 },
     { type: 'wait', params: { ms: 3000 } },
-    { type: 'play', params: {}, delayMs: 500, timeoutMs: 5000 },
+    { type: 'play', params: {}, delayMs: 500, timeoutMs: 8000 },
     { type: 'wait', params: { ms: 5000 } },
     { type: 'pause', params: {}, delayMs: 500 },
     { type: 'wait', params: { ms: 2000 } },

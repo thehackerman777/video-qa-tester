@@ -23,6 +23,7 @@ export {
   antiAbuseTriggerScenario,
   subscribeJourneyScenario,
   quickLoadScenario,
+  viewCountingScenario,
   DEFAULT_SCENARIOS,
 } from './scenarios/definitions';
 

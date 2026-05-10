@@ -281,38 +281,61 @@ export class ScenarioRunner {
   private async playVideo(): Promise<void> {
     logger.debug({ msg: 'Playing video' });
 
-    // First try programmatic play (works in headless)
-    const played = await this.page.evaluate(() => {
-      const video = document.querySelector('video');
-      if (video) {
-        video.play().catch(() => {});
-        return true;
+    // Step 1: Try to click the video player area to initiate playback
+    // YouTube requires a user gesture before it allows play()
+    await this.page.evaluate(() => {
+      // Try multiple selectors for the YouTube player
+      const selectors = [
+        '#movie_player',
+        '.html5-video-player',
+        'ytd-player',
+        '#ytd-player',
+        '.video-stream',
+        'video',
+        '#c4-player',
+        '.player-container',
+        '[role="button"][aria-label*="Play"]',
+        '.ytp-play-button',
+      ];
+
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+          (el as HTMLElement).click();
+          break;
+        }
       }
-      // Try clicking the player area instead
-      const player = document.querySelector('#movie_player, .html5-video-player, ytd-player');
-      if (player) {
-        (player as HTMLElement).click();
-        return true;
+    });
+
+    await this.page.waitForTimeout(2000);
+
+    // Step 2: Now try to programmatically play all video elements
+    const played = await this.page.evaluate(() => {
+      const videos = document.querySelectorAll('video');
+      if (videos.length > 0) {
+        let playedCount = 0;
+        videos.forEach(v => {
+          try { 
+            v.muted = true; // Mute to bypass autoplay restrictions
+            const p = v.play();
+            if (p) {
+              p.catch(() => {});
+              playedCount++;
+            }
+          } catch {}
+        });
+        return playedCount > 0;
       }
       return false;
     });
 
     if (played) {
-      await this.page.waitForTimeout(1500);
-      return;
+      logger.debug({ msg: 'Video playback started successfully' });
+    } else {
+      logger.debug({ msg: 'Could not start video playback (no video elements found)' });
     }
 
-    // Fallback: click the video element directly via dispatchEvent
-    await this.page.evaluate(() => {
-      const video = document.querySelector('video');
-      if (video) {
-        // Dispatch a click event directly on the video
-        video.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        setTimeout(() => video.play().catch(() => {}), 100);
-      }
-    });
-
-    await this.page.waitForTimeout(1500);
+    await this.page.waitForTimeout(1000);
   }
 
   private async pauseVideo(): Promise<void> {
@@ -392,10 +415,10 @@ export class ScenarioRunner {
     logger.debug({ msg: `Changing playback speed to: ${speed}x` });
 
     await this.page.evaluate((playbackSpeed: number) => {
-      const video = document.querySelector('video');
-      if (video) {
-        video.playbackRate = playbackSpeed;
-      }
+      const videos = document.querySelectorAll('video');
+      videos.forEach(v => {
+        try { v.playbackRate = playbackSpeed; } catch {}
+      });
     }, speed);
   }
 
