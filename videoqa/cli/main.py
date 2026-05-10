@@ -22,6 +22,7 @@ from rich import box
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from videoqa.core.browser import UndetectedYouTubeBrowser
+from videoqa.core.session_manager import SessionManager, ChannelScanner, ViewDistributor
 
 console = Console()
 
@@ -280,6 +281,139 @@ async def run_one(browser, url, watch_time, idx) -> bool:
         except:
             pass
         return False
+
+
+@cli.group()
+def sessions():
+    """Manage multiple sessions (users)."""
+    pass
+
+
+@sessions.command()
+def list():
+    """List all available sessions."""
+    mgr = SessionManager()
+    sessions_list = mgr.list_sessions()
+    if not sessions_list:
+        console.print("[yellow]No sessions. Import cookies first.[/yellow]")
+        return
+    table = Table(box=box.SIMPLE)
+    table.add_column("Session")
+    table.add_column("Cookies")
+    table.add_column("Identity")
+    table.add_column("Last Used")
+    for s in sessions_list:
+        table.add_row(
+            s["id"],
+            "✅" if s["has_cookies"] else "❌",
+            "✅" if s["has_identity"] else "❌",
+            s["last_used"][:19],
+        )
+    console.print(table)
+
+
+@sessions.command()
+@click.argument("cookie_file")
+def import_cookies(cookie_file):
+    """Import cookies from a Netscape format file."""
+    mgr = SessionManager()
+    sid = mgr.import_netscape_cookies(cookie_file)
+    console.print(f"[green]✅ Imported as {sid}[/green]")
+
+
+@sessions.command()
+@click.option("--pattern", default="cookies_*.txt", help="File pattern")
+def import_batch(pattern):
+    """Import multiple cookie files at once."""
+    mgr = SessionManager()
+    sessions = mgr.create_batch_from_netscape_files(pattern)
+    console.print(f"[green]✅ Imported {len(sessions)} sessions[/green]")
+
+
+@cli.command()
+@click.argument("channel")
+@click.option("--max-videos", default=20, help="Top N videos by views")
+def scan(channel, max_videos):
+    """Scan channel and show top videos by popularity."""
+    scanner = ChannelScanner()
+    
+    if channel.startswith("@"):
+        url = f"https://www.youtube.com/{channel}/videos"
+    else:
+        url = f"https://www.youtube.com/channel/{channel}/videos"
+    
+    console.print(f"[bold]Scanning {channel}...[/bold]")
+    videos = scanner.scan_videos(url, max_videos)
+    
+    if not videos:
+        console.print("[red]No videos found[/red]")
+        return
+    
+    # Sort by estimated views
+    for v in videos:
+        v["views"] = scanner.extract_view_count(v.get("meta", ""))
+    videos.sort(key=lambda v: v["views"], reverse=True)
+    
+    table = Table(box=box.SIMPLE)
+    table.add_column("#")
+    table.add_column("Title")
+    table.add_column("Views")
+    table.add_column("ID")
+    for i, v in enumerate(videos[:20]):
+        views = f"{v['views']:,}" if v["views"] else "N/A"
+        table.add_row(str(i + 1), v["title"][:50], views, v["id"])
+    console.print(table)
+    
+    # Save to file for later use
+    import json
+    output = Path("videos_output.json")
+    output.write_text(json.dumps(videos, indent=2))
+    console.print(f"Saved to {output}")
+
+
+@cli.command()
+@click.argument("channel")
+@click.option("--views", default=20, help="Total views to distribute")
+@click.option("--top", default=10, help="Use top N videos")
+def distribute(channel, views, top):
+    """Distribute X views across top N videos of a channel."""
+    mgr = SessionManager()
+    scanner = ChannelScanner()
+    distributor = ViewDistributor(mgr)
+    
+    # Scan channel
+    if channel.startswith("@"):
+        url = f"https://www.youtube.com/{channel}/videos"
+    else:
+        url = f"https://www.youtube.com/channel/{channel}/videos"
+    
+    console.print(f"[bold]Scanning channel...[/bold]")
+    videos = scanner.scan_videos(url, top * 2)
+    
+    if not videos:
+        console.print("[red]No videos found[/red]")
+        return
+    
+    for v in videos:
+        v["views"] = scanner.extract_view_count(v.get("meta", ""))
+    videos.sort(key=lambda v: v["views"], reverse=True)
+    videos = videos[:top]
+    
+    console.print(f"Top {top} videos:")
+    for i, v in enumerate(videos):
+        console.print(f"  {i+1}. {v['title'][:50]} ({v['views']:,} views)")
+    
+    # Check sessions
+    session_count = mgr.count()
+    console.print(f"\nAvailable sessions: {session_count}")
+    
+    if session_count == 0:
+        console.print("[red]No sessions. Import cookies first:[/red]")
+        console.print("  videoqa sessions import-batch --pattern 'cookies_*.txt'")
+        return
+    
+    # Distribute
+    asyncio.run(distributor.distribute_views(videos, views))
 
 
 if __name__ == "__main__":
