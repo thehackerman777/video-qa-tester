@@ -1,73 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-4xl">
-    <div class="flex justify-between items-center mb-4">
-        <h1>📊 Dashboard</h1>
-        <span class="text-sm text-muted" id="live-status"></span>
-    </div>
+<div class="flex justify-between items-center mb-4">
+    <h1>Dashboard</h1>
+    <a href="/test" class="btn btn-blue">+ New Test</a>
+</div>
 
-    <div class="row mb-4">
-        <div class="col card stat">
-            <div class="stat-value text-accent">{{ sessions|length }}</div>
-            <div class="stat-label">Sessions</div>
-        </div>
-        <div class="col card stat">
-            <div class="stat-value" style="color:#2e7d32">{{ results|selectattr("passed", "gt", 0)|list|length }}</div>
-            <div class="stat-label">Tests Passed</div>
-        </div>
-        <div class="col card stat">
-            <div class="stat-value" style="color:#c62828">{{ results|selectattr("failed", "gt", 0)|list|length }}</div>
-            <div class="stat-label">Failing</div>
-        </div>
-        <div class="col card stat">
-            <div class="stat-value">{{ results|length }}</div>
-            <div class="stat-label">Total Runs</div>
-        </div>
+<div class="card-stats">
+    <div class="stat-card">
+        <div class="stat-value" style="color:#065fd4">{{ sessions|length }}</div>
+        <div class="stat-label">Sessions</div>
     </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color:#2e7d32">{{ results|selectattr("passed", "gt", 0)|list|length }}</div>
+        <div class="stat-label">Tests Passed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color:#c62828">{{ results|selectattr("failed", "gt", 0)|list|length }}</div>
+        <div class="stat-label">Failed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ results|length }}</div>
+        <div class="stat-label">Total Runs</div>
+    </div>
+</div>
 
-    <div class="row mb-4">
-        <a href="/sessions" class="card-light col" style="text-decoration:none">
-            <div class="stat-value" style="font-size:24px">🔑</div>
-            <div style="font-weight:500">Import Cookies</div>
-            <div class="text-sm text-muted">Add a YouTube session</div>
-        </a>
-        <a href="/channels" class="card-light col" style="text-decoration:none">
-            <div class="stat-value" style="font-size:24px">📡</div>
-            <div style="font-weight:500">Scan Channel</div>
-            <div class="text-sm text-muted">Discover videos</div>
-        </a>
-        <a href="/test" class="card-light col" style="text-decoration:none">
-            <div class="stat-value" style="font-size:24px">🧪</div>
-            <div style="font-weight:500">Run Tests</div>
-            <div class="text-sm text-muted">Single or distribute</div>
-        </a>
-        <a href="/logs" class="card-light col" style="text-decoration:none">
-            <div class="stat-value" style="font-size:24px">📋</div>
-            <div style="font-weight:500">Logs</div>
-            <div class="text-sm text-muted">Server debug</div>
-        </a>
+<div class="card">
+    <div class="card-header">⚡ Quick Actions</div>
+    <div class="flex gap-4" style="flex-wrap:wrap">
+        <a href="/sessions" class="btn">🔑 Import Cookies</a>
+        <a href="/channels" class="btn">📡 Scan Channel</a>
+        <a href="/test" class="btn">🧪 Run Single Test</a>
+        <a href="/test" class="btn btn-blue">📊 Distribute Views</a>
     </div>
+</div>
 
-    <h2>Recent Results</h2>
-    <div class="card">
-        {% if results %}
-        <table>
-            <tr><th>Time</th><th>Type</th><th>Target</th><th>Passed</th><th>Failed</th></tr>
-            {% for r in results[-10:]|reverse %}
-            <tr>
-                <td class="text-sm text-muted">{{ r.timestamp[11:19] }}</td>
-                <td>{{ r.get("type", "test") }}</td>
-                <td class="truncate" style="max-width:300px">{{ r.get("url") or r.get("channel","") }}</td>
-                <td><span class="badge badge-green">{{ r.passed }}</span></td>
-                <td>{% if r.failed > 0 %}<span class="badge badge-red">{{ r.failed }}</span>{% endif %}</td>
-            </tr>
-            {% endfor %}
-        </table>
-        {% else %}
-        <div class="text-center text-muted" style="padding:40px 0">
-            No tests yet. Import a session or scan a channel.
-        </div>
-        {% endif %}
+<div class="card">
+    <div class="card-header">📋 Recent Results</div>
+    {% if results %}
+    <table>
+        <tr><th>Time</th><th>Type</th><th>Target</th><th>Status</th></tr>
+        {% for r in results[-10:]|reverse %}
+        <tr>
+            <td class="text-sm text-muted">{{ r.timestamp[11:19] }}</td>
+            <td>{{ r.get("type","test") }}</td>
+            <td class="truncate">{{ r.get("url") or r.get("channel","") }}</td>
+            <td>
+                <span class="badge badge-green">{{ r.passed }} ok</span>
+                {% if r.failed > 0 %}<span class="badge badge-red">{{ r.failed }} fail</span>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <div style="padding:40px 0;text-align:center;color:var(--color-medium-gray)">
+        No results yet. Start by importing a session and running a test.
     </div>
+    {% endif %}
 </div>
 {% endblock %}

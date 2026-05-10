@@ -38,8 +38,24 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 # Services
 session_mgr = SessionManager()
 scanner = ChannelScanner()
-test_results = []
+
+# Persistence: save results to disk
+RESULTS_FILE = Path("data/test_results.json")
+RESULTS_FILE.parent.mkdir(exist_ok=True)
 running_tasks = {}
+
+def load_results():
+    if RESULTS_FILE.exists():
+        try:
+            return json.loads(RESULTS_FILE.read_text())
+        except:
+            return []
+    return []
+
+def save_results(results):
+    RESULTS_FILE.write_text(json.dumps(results[-200:], indent=2))
+
+test_results = load_results()
 
 
 # ============================================================
@@ -217,6 +233,7 @@ async def run_test(url: str = Form(...), watch_time: int = Form(45), count: int 
             test_results.append({"id": task_id, "url": url, "timestamp": datetime.now().isoformat(), "results": results,
                                  "passed": sum(1 for r in results if r["status"] == "passed"),
                                  "failed": sum(1 for r in results if r["status"] != "passed")})
+            save_results(test_results)
             logger.info(f"Test {task_id}: {len(results)} instances, {test_results[-1]['passed']} passed")
         finally:
             running_tasks.pop(task_id, None)
@@ -244,6 +261,7 @@ async def distribute_views(channel: str = Form(...), total_views: int = Form(20)
                                  "type": "distribute", "results": results,
                                  "passed": sum(1 for r in results if r.get("success")),
                                  "failed": sum(1 for r in results if not r.get("success"))})
+            save_results(test_results)
             logger.info(f"Distribute {task_id}: {test_results[-1]['passed']}/{total_views} succeeded")
         finally:
             running_tasks.pop(task_id, None)

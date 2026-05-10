@@ -1,19 +1,78 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-4xl">
-    <div class="flex justify-between items-center mb-4">
-        <h1>📋 Server Logs</h1>
-        <button class="btn btn-sm" onclick="refreshLogs()">↻ Refresh</button>
+<div class="flex justify-between items-center mb-4">
+    <h1>Server Logs</h1>
+    <div>
+        <button class="btn" onclick="clearLogs()">Clear</button>
+        <button class="btn btn-blue" onclick="refreshLogs()">↻ Refresh</button>
     </div>
-    <div class="log-box" id="log-content">{{ logs }}</div>
-    <div class="text-sm text-muted mt-2">Auto-refreshes every 5s. Shows last ~5000 chars.</div>
 </div>
+
+<div class="card">
+    <div class="card-header">📋 /tmp/videoqa-web.log</div>
+    <div class="log-box" id="log-content">
+        {%- if logs %}
+            {%- set lines = logs.split("\n") %}
+            {%- for line in lines %}
+                {%- if line.strip() %}
+                    {%- set lc = line.lower() %}
+                    {%- if "[error]" in lc %}
+                        <span class="error">{{ line }}</span>
+                    {%- elif "[warn" in lc or "[warning]" in lc %}
+                        <span class="warn">{{ line }}</span>
+                    {%- elif "[info]" in lc %}
+                        <span class="info">{{ line }}</span>
+                    {%- elif "[debug]" in lc %}
+                        <span class="debug">{{ line }}</span>
+                    {%- else %}
+                        {{ line }}
+                    {%- endif %}
+                    {% if not loop.last %}<br>{% endif %}
+                {%- endif %}
+            {%- endfor %}
+        {%- else %}
+            No log data available. Server may need requests to generate logs.
+        {%- endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">⚙️ System</div>
+    <div class="flex gap-4">
+        <span class="badge badge-blue">systemd: active</span>
+        <span class="badge badge-blue">port: 8081</span>
+        <span class="badge badge-blue" id="log-size"></span>
+    </div>
+</div>
+
 <script>
     function refreshLogs() {
         fetch('/api/logs').then(r=>r.json()).then(d => {
-            document.getElementById('log-content').textContent = d.logs;
+            if (d.logs) {
+                const el = document.getElementById('log-content');
+                const lines = d.logs.split('\n');
+                let html = '';
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    const lc = line.toLowerCase();
+                    let cls = '';
+                    if (lc.includes('[error]')) cls = 'error';
+                    else if (lc.includes('[warn')) cls = 'warn';
+                    else if (lc.includes('[info]')) cls = 'info';
+                    else if (lc.includes('[debug]')) cls = 'debug';
+                    html += `<span class="${cls}">${line.replace(/</g,'&lt;')}</span><br>`;
+                }
+                el.innerHTML = html;
+                document.getElementById('log-size').textContent = `${(d.logs.length / 1024).toFixed(1)} KB`;
+            }
         }).catch(() => {});
     }
+
+    function clearLogs() {
+        document.getElementById('log-content').innerHTML = '<span class="text-muted">Logs cleared (local)</span>';
+    }
+
     setInterval(refreshLogs, 5000);
+    setTimeout(refreshLogs, 500);
 </script>
 {% endblock %}
