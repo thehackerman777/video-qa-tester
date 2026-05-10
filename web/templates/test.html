@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">🧪 Test Runner</h1>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-6" id="test-tabs">
+        <button class="tab active" data-tab="single" onclick="switchTab('single')">Single Test</button>
+        <button class="tab" data-tab="distribute" onclick="switchTab('distribute')">Distribute Views</button>
+    </div>
+
+    <!-- Single Test -->
+    <div id="tab-single" class="space-y-4">
+        <div class="card">
+            <h2 class="font-bold mb-3">▶ Single Video Test</h2>
+            <form hx-post="/api/test/run" hx-target="#single-result" hx-indicator="#single-spinner" class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-400 block mb-1">Video URL</label>
+                    <input type="url" name="url" id="test-url" class="input" placeholder="https://www.youtube.com/watch?v=..." required>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Watch Time (s)</label>
+                        <input type="number" name="watch_time" class="input" value="45" min="10" max="300">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Instances</label>
+                        <input type="number" name="count" class="input" value="1" min="1" max="50">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Session</label>
+                        <select name="session" class="input">
+                            <option value="">Random</option>
+                            {% for s in sessions %}
+                            <option value="{{ s.id }}">{{ s.id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <span id="single-spinner" class="spinner hidden"></span>
+                    ▶ Run Test
+                </button>
+            </form>
+        </div>
+        <div id="single-result"></div>
+    </div>
+
+    <!-- Distribute -->
+    <div id="tab-distribute" class="hidden space-y-4">
+        <div class="card">
+            <h2 class="font-bold mb-3">📊 Distribute Views Across Channel</h2>
+            <form hx-post="/api/test/distribute" hx-target="#dist-result" hx-indicator="#dist-spinner" class="space-y-3">
+                <div>
+                    <label class="text-xs text-gray-400 block mb-1">Channel</label>
+                    <input type="text" name="channel" id="dist-channel" class="input" placeholder="@elpepe8659" required>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Total Views</label>
+                        <input type="number" name="total_views" class="input" value="20" min="1" max="1000">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 block mb-1">Top N Videos</label>
+                        <input type="number" name="top_videos" class="input" value="10" min="1" max="50">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success">
+                    <span id="dist-spinner" class="spinner hidden"></span>
+                    🚀 Start Distribution
+                </button>
+            </form>
+        </div>
+        <div id="dist-result"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="mt-6">
+        <h2 class="text-lg font-bold mb-3">📋 Results</h2>
+        <div class="card" id="results-list">
+            <div id="results-content">
+                {% for r in results[-10:]|reverse %}
+                <div class="border-b border-dark-700 py-2 text-sm">
+                    <span class="text-gray-400 text-xs">{{ r.timestamp[11:19] }}</span>
+                    <span class="ml-2">{{ r.get("type", "test") }}</span>
+                    <span class="ml-2 badge bg-emerald-600/20 text-emerald-400">{{ r.passed }} ok</span>
+                    {% if r.failed > 0 %}
+                    <span class="badge bg-red-600/20 text-red-400">{{ r.failed }} fail</span>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-gray-500">No results yet</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchTab(name) {
+        document.querySelectorAll('[data-tab]').forEach(t => t.classList.remove('active'));
+        document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+        document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
+        document.getElementById(`tab-${name}`).classList.remove('hidden');
+    }
+
+    // Handle results showing up
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'single-result' || evt.detail.target.id === 'dist-result') {
+            const data = JSON.parse(evt.detail.serverResponse);
+            if (data.status === 'started') {
+                const el = evt.detail.target;
+                el.innerHTML = `<div class="card bg-emerald-900/20 border-emerald-700">
+                    <div class="flex items-center gap-2">
+                        <span class="spinner"></span>
+                        <span>Test started! Task: ${data.task_id}</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">Results will appear in the list below when complete</div>
+                </div>`;
+                
+                // Poll for results
+                const poll = setInterval(() => {
+                    fetch('/api/results').then(r => r.json()).then(data => {
+                        const last = data[data.length - 1];
+                        if (last && last.id === data.task_id) {
+                            clearInterval(poll);
+                            // Refresh results list
+                            htmx.trigger('#results-content', 'reload');
+                        }
+                    }).catch(() => {});
+                }, 2000);
+            }
+        }
+    });
+</script>
+{% endblock %}

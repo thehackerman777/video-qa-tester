@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">📡 Channel Scanner</h1>
+
+    <!-- Scan Form -->
+    <div class="card mb-6">
+        <form hx-post="/api/scan" hx-target="#video-results" hx-indicator="#scan-spinner" class="flex gap-3 items-end">
+            <div class="flex-1">
+                <label class="text-xs text-gray-400 block mb-1">Channel Handle or URL</label>
+                <input type="text" name="channel" class="input" placeholder="@elpepe8659 or UC...">
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 block mb-1">Max Videos</label>
+                <input type="number" name="max_videos" class="input w-24" value="50">
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 block mb-1">Sort</label>
+                <select name="sort" class="input">
+                    <option value="views">By Views</option>
+                    <option value="newest">Newest</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">🔍 Scan</button>
+        </form>
+        <div id="scan-spinner" class="spinner ml-auto hidden"></div>
+    </div>
+
+    <!-- Search/filter results -->
+    <div class="card mb-6" id="video-results">
+        <div class="text-center py-12 text-gray-500">
+            <div class="text-4xl mb-3">📡</div>
+            <div>Enter a channel handle and click Scan</div>
+            <div class="text-xs mt-1 text-gray-600">e.g. @elpepe8659 or UC_x5XG1OV2P6uZZ5FSM9Ttw</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.body.addEventListener('htmx:beforeSwap', function(evt) {
+        if (evt.detail.target.id === 'video-results' && evt.detail.xhr.responseURL?.includes('/api/scan')) {
+            const data = JSON.parse(evt.detail.serverResponse);
+            if (data.status === 'ok') {
+                renderVideos(data);
+                evt.detail.shouldSwap = false;
+            }
+        }
+    });
+
+    function renderVideos(data) {
+        const container = document.getElementById('video-results');
+        if (!data.videos || data.videos.length === 0) {
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">No videos found</div>';
+            return;
+        }
+
+        let html = `<div class="flex justify-between items-center mb-3">
+            <span class="text-sm text-gray-400">${data.total} videos found</span>
+            <button onclick="runDistribute('${data.videos[0]?.url?.split('?v=')[1] || ''}')" class="btn btn-success text-xs">Distribute Views</button>
+        </div>
+        <div class="grid gap-2 max-h-[600px] overflow-y-auto">`;
+
+        data.videos.forEach((v, i) => {
+            const views = v.views ? v.views.toLocaleString() : 'N/A';
+            html += `<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-dark-700 transition">
+                <span class="text-gray-500 text-xs w-6 text-right">${i+1}</span>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm truncate">${v.title}</div>
+                    <div class="text-xs text-gray-500 flex gap-3">
+                        <span>👁 ${views}</span>
+                        <span class="text-gray-600">${v.id}</span>
+                    </div>
+                </div>
+                <div class="flex gap-1">
+                    <button onclick="runTest('${v.url}')" class="btn btn-primary text-xs py-1 px-2">Test</button>
+                    <button onclick="copyUrl('${v.url}')" class="btn text-xs py-1 px-2 bg-dark-600 hover:bg-dark-500">Copy</button>
+                </div>
+            </div>`;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    function runTest(url) {
+        document.getElementById('test-url').value = url;
+        document.querySelector('[data-tab="test"]')?.click();
+        window.location.href = '/test';
+    }
+
+    function copyUrl(url) {
+        navigator.clipboard.writeText(url);
+    }
+
+    function runDistribute(videoId) {
+        const channel = document.querySelector('input[name="channel"]').value;
+        if (channel) {
+            document.getElementById('dist-channel').value = channel;
+            window.location.href = '/test';
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video QA Tester</title>
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 900: '#0f0f1a', 800: '#1a1a2e', 700: '#252540', 600: '#2d2d50' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; }
+        .glass { background: rgba(26,26,46,0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+        .btn { @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm; }
+        .btn-primary { @apply bg-indigo-600 hover:bg-indigo-500 text-white; }
+        .btn-success { @apply bg-emerald-600 hover:bg-emerald-500 text-white; }
+        .btn-warning { @apply bg-amber-600 hover:bg-amber-500 text-white; }
+        .btn-danger { @apply bg-red-600 hover:bg-red-500 text-white; }
+        .input { @apply w-full px-3 py-2 rounded-lg bg-dark-700 border border-dark-600 text-gray-200 focus:border-indigo-500 focus:outline-none; }
+        .card { @apply glass rounded-xl p-4; }
+        .badge { @apply px-2 py-0.5 rounded-full text-xs font-medium; }
+        .tab { @apply px-4 py-2 rounded-lg text-sm cursor-pointer transition-colors; }
+        .tab.active { @apply bg-indigo-600 text-white; }
+        .tab:not(.active) { @apply text-gray-400 hover:text-white hover:bg-dark-600; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1a1a2e; }
+        ::-webkit-scrollbar-thumb { background: #2d2d50; border-radius: 3px; }
+        .skeleton { animation: pulse 2s infinite; @apply bg-dark-600 rounded; }
+        @keyframes pulse { 0%,100% { opacity: 0.4 } 50% { opacity: 0.8 } }
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #6366f1; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg) } }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-200 min-h-screen">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <nav class="w-56 bg-dark-800 border-r border-dark-600 flex flex-col p-3">
+            <div class="text-lg font-bold mb-6 px-2 flex items-center gap-2">
+                <span class="text-indigo-400">▶</span> QA Tester
+                <span class="text-xs text-gray-500 ml-auto">v1</span>
+            </div>
+            
+            <div class="flex flex-col gap-1 flex-1">
+                <a href="/" class="tab {% if page == 'dashboard' %}active{% endif %}" hx-boost="true">📊 Dashboard</a>
+                <a href="/sessions" class="tab {% if page == 'sessions' %}active{% endif %}" hx-boost="true">🔑 Sessions</a>
+                <a href="/channels" class="tab {% if page == 'channels' %}active{% endif %}" hx-boost="true">📡 Channels</a>
+                <a href="/test" class="tab {% if page == 'test' %}active{% endif %}" hx-boost="true">🧪 Tests</a>
+            </div>
+
+            <div class="mt-auto pt-3 border-t border-dark-600">
+                <div class="text-xs text-gray-500 px-2" id="status-bar">
+                    <div class="flex justify-between mb-1">
+                        <span>Sessions</span>
+                        <span id="session-count">{{ sessions|length }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Running</span>
+                        <span id="task-count">{{ running }}</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main -->
+        <main class="flex-1 overflow-y-auto p-6" id="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        // Auto-refresh status
+        setInterval(() => {
+            fetch('/api/status').then(r => r.json()).then(d => {
+                document.getElementById('session-count').textContent = d.sessions;
+                document.getElementById('task-count').textContent = d.running_tasks;
+            }).catch(() => {});
+        }, 3000);
+    </script>
+</body>
+</html>
