@@ -1,87 +1,102 @@
 # 🎬 Video QA Tester (Python)
 
-**Automated QA testing for YouTube and video platforms.**
-
-Simulates real user behavior for legitimate testing of your own content.
-All traffic is marked as `internal_testing`.
-
-> ⚠️ **For testing your own content only.**
+**Automated QA testing for YouTube — genera vistas reales en tus propios videos.**
 
 ## ✨ Features
 
-- **Authenticated testing** — Login to YouTube to avoid bot detection
-- **Session persistence** — Login once, reuse sessions
-- **View counting validation** — Watch 35s+ to trigger YouTube view counting
-- **Channel scanning** — Discover all videos from a channel
-- **Load testing** — 100+ concurrent users
-- **Stealth browser** — Removes automation detection signals
-- **Debug mode** — See full player state, screenshots
+- **Login + sesión persistente** — Loguéate una vez, el sistema guarda las cookies
+- **Reproducción real** — Video.play() + 45s de watch time para contar vistas
+- **Anti-detección** — Elimina navegator.webdriver, plugins, chrome.runtime falso
+- **Multi-instancia** — Corre N sesiones simultáneas
+- **Docker** — Aislamiento por contenedor
+- **Debug** — Screenshots, estado del player, errores de consola
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Guía paso a paso)
 
+### 0. Setup
 ```bash
-# Install
+# En el dev-vps
+cd /home/ubuntu/video-qa-tester
+source .venv/bin/activate
 pip install -r requirements.txt
-playwright install chromium
-
-# 1. Login (needed to bypass YouTube's bot detection)
-python -m videoqa.cli.main login --email your-account@gmail.com
-
-# 2. Test a single video
-python -m videoqa.cli.main test "https://www.youtube.com/watch?v=YOUR_VIDEO"
-
-# 3. Scan a channel
-python -m videoqa.cli.main scan "@YourChannel"
-
-# 4. Run 10 users
-python -m videoqa.cli.main loadtest "https://www.youtube.com/watch?v=YOUR_VIDEO" --users 10
+python3 -m playwright install chromium
 ```
 
-## 📋 Commands
+### 1. Crear cuenta Google de testing
 
-| Command | Description |
+Hazlo en tu navegador normal (NO en el servidor):
+1. Ve a https://accounts.google.com/SignUp
+2. Crea una cuenta nueva (ej: `micanal.testing.1@gmail.com`)
+3. Pon tu celular para verificar
+4. Ve a YouTube, suscríbete a tu canal, da like a un video
+
+Guarda el email y contraseña.
+
+### 2. Login en nuestro sistema
+
+```bash
+# En el dev-vps, edita las credenciales:
+nano .yt-credentials.json
+
+# Pon tu email y contraseña ahí
+# Luego ejecuta (se abrirá Chrome visible):
+python3 scripts/auto_login.py
+```
+
+Te aparecerá Chrome, Google hará login automáticamente.
+Si pide 2FA/captcha, resuélvelo manualmente.
+**Las cookies se guardan automáticamente.**
+
+### 3. Probar reproducción
+
+```bash
+# Con sesión guardada, prueba un video:
+python3 -m videoqa.cli.main test "https://www.youtube.com/watch?v=Wf_q_N7GmGQ" --watch-time 45
+```
+
+### 4. Múltiples instancias
+
+```bash
+# 10 sesiones viendo el mismo video:
+python3 -m videoqa.cli.main test "https://www.youtube.com/watch?v=Wf_q_N7GmGQ" --count 10 --watch-time 45
+```
+
+## 📋 Comandos
+
+| Comando | Descripción |
 |---------|-------------|
-| `test <url>` | Test a single video — plays for 35s |
-| `scan <channel>` | Discover videos from a channel |
-| `loadtest <url>` | Run concurrent users against a video |
-| `login` | Login to Google and save session |
-| `debug <url>` | Show detailed player state |
-| `status` | Check saved session |
-| `clear-session` | Remove saved session |
+| `test <url>` | Reproduce un video (single o multi-instancia) |
+| `scan <channel>` | Descubre videos de un canal |
+| `debug <url>` | Debug detallado del player |
+| `inject <url>` | Modo interceptor de API (experimental) |
 
-## 🛡️ How It Works
+## 🔬 Qué hace el sistema
 
-1. **Login first** — YouTube blocks unauthenticated headless browsers with "Sign in to confirm you're not a bot". Login once, session is saved.
-2. **Stealth mode** — Removes `navigator.webdriver`, adds realistic browser fingerprints.
-3. **Play + wait** — Clicks the player, calls `video.play()` programmatically, waits 35s+ for YouTube's view threshold.
-4. **Session reuse** — Saved cookies/storage mean subsequent tests don't need login.
+1. **Navega** al video en YouTube
+2. **Click** en el player
+3. **video.play()** con muted=true
+4. **Espera 45s** (umbral de vista de YouTube)
+5. **Verifica** que el tiempo avance
+6. **Guarda** las cookies para reuso
 
-## 🏗️ Structure
+## 📁 Estructura
 
 ```
 videoqa/
 ├── core/
-│   ├── types.py      # Data types & configs
-│   └── browser.py    # YouTubeBrowser — stealth, sessions, playback
+│   ├── browser.py      # Browser anti-detección + sesiones
+│   ├── interceptor.py  # Interceptor de API YouTube
+│   └── types.py
 ├── cli/
-│   └── main.py       # All CLI commands
+│   └── main.py         # Todos los comandos
+scripts/
+├── auto_login.py       # Login automático con guardado de sesión
+├── proxy-rotator/      # Rotador de proxies en Rust
 ```
 
-## 🔧 Configuration
+## 🔧 Requisitos
 
-| Env var | Default | Description |
-|---------|---------|-------------|
-| `YT_EMAIL` | — | YouTube test account email |
-| `YT_PASS` | — | YouTube test account password |
-| `VIDEOQA_HEADLESS` | `true` | Run headless |
-| `VIDEOQA_BROWSERS` | `10` | Max concurrent browsers |
-
-## 📊 Debugging
-
-```bash
-# Show detailed player state
-python -m videoqa.cli.main debug "https://www.youtube.com/watch?v=YOUR_VIDEO" --headed
-
-# Check if session is valid
-python -m videoqa.cli.main status
-```
+- Python 3.11+
+- Playwright + Chromium
+- **Cuenta Google** (para bypassear LOGIN_REQUIRED)
+- Docker (para multi-instancia aislada)
