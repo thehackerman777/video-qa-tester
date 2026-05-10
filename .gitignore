@@ -26,3 +26,5 @@ sessions/*.json
 # OS
 .DS_Store
 Thumbs.db
+profiles/
+yt-cookies.txt
