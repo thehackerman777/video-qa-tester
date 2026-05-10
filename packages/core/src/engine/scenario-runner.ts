@@ -281,22 +281,38 @@ export class ScenarioRunner {
   private async playVideo(): Promise<void> {
     logger.debug({ msg: 'Playing video' });
 
-    // Try clicking the video player
-    const videoElement = await this.page.$('video');
-    if (videoElement) {
-      await videoElement.click();
-      await this.page.waitForTimeout(500);
+    // First try programmatic play (works in headless)
+    const played = await this.page.evaluate(() => {
+      const video = document.querySelector('video');
+      if (video) {
+        video.play().catch(() => {});
+        return true;
+      }
+      // Try clicking the player area instead
+      const player = document.querySelector('#movie_player, .html5-video-player, ytd-player');
+      if (player) {
+        (player as HTMLElement).click();
+        return true;
+      }
+      return false;
+    });
 
-      // Try playing programmatically
-      await this.page.evaluate(() => {
-        const video = document.querySelector('video');
-        if (video) {
-          video.play().catch(() => {}); // Autoplay might be blocked
-        }
-      });
+    if (played) {
+      await this.page.waitForTimeout(1500);
+      return;
     }
 
-    await this.page.waitForTimeout(1000);
+    // Fallback: click the video element directly via dispatchEvent
+    await this.page.evaluate(() => {
+      const video = document.querySelector('video');
+      if (video) {
+        // Dispatch a click event directly on the video
+        video.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        setTimeout(() => video.play().catch(() => {}), 100);
+      }
+    });
+
+    await this.page.waitForTimeout(1500);
   }
 
   private async pauseVideo(): Promise<void> {
@@ -304,7 +320,7 @@ export class ScenarioRunner {
 
     await this.page.evaluate(() => {
       const video = document.querySelector('video');
-      if (video) {
+      if (video && !video.paused) {
         video.pause();
       }
     });

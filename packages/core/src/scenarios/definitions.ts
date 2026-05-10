@@ -187,6 +187,31 @@ export const subscribeJourneyScenario: TestScenario = {
 };
 
 /**
+ * Scenario 7: Quick Load Test
+ * Minimal scenario for load testing — fast execution.
+ */
+export const quickLoadScenario: TestScenario = {
+  id: 'load-quick',
+  name: 'Quick Load Test',
+  description: 'Fast scenario designed for load testing with minimal delays',
+  category: 'load',
+  weight: 100,
+  actions: [
+    { type: 'navigate', params: { url: '{{VIDEO_URL}}' }, delayMs: 500, timeoutMs: 15000 },
+    { type: 'wait', params: { ms: 3000 } },
+    { type: 'play', params: {}, delayMs: 500, timeoutMs: 5000 },
+    { type: 'wait', params: { ms: 5000 } },
+    { type: 'pause', params: {}, delayMs: 500 },
+    { type: 'wait', params: { ms: 2000 } },
+    { type: 'resume', params: {}, delayMs: 500 },
+    { type: 'wait', params: { ms: 5000 } },
+  ],
+  expectedOutcomes: [
+    { metric: 'duration', operator: 'gt', expectedValue: 0 },
+  ],
+};
+
+/**
  * Collection of all default scenarios
  */
 export const DEFAULT_SCENARIOS: TestScenario[] = [
@@ -196,4 +221,5 @@ export const DEFAULT_SCENARIOS: TestScenario[] = [
   resolutionHopperScenario,
   antiAbuseTriggerScenario,
   subscribeJourneyScenario,
+  quickLoadScenario,
 ];

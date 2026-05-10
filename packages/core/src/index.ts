@@ -22,6 +22,7 @@ export {
   resolutionHopperScenario,
   antiAbuseTriggerScenario,
   subscribeJourneyScenario,
+  quickLoadScenario,
   DEFAULT_SCENARIOS,
 } from './scenarios/definitions';
 
