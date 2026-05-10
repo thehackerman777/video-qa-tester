@@ -63,12 +63,17 @@ async def main():
         await email_input.fill(account["email"])
         await page.wait_for_timeout(300)
         await page.keyboard.press("Enter")
-        await page.wait_for_timeout(4000)
+        await page.wait_for_timeout(5000)
         print("2. Email entered")
+        
+        # Screenshot for debug
+        await page.screenshot(path="/tmp/login-step1.png")
+        print("   Screenshot: /tmp/login-step1.png")
 
         # Step 2: Password
+        # Wait for visible password field (exclude hidden one)
         pass_input = await page.wait_for_selector(
-            "input[type='password']", timeout=15000)
+            "input[type='password']:not([aria-hidden='true'])", timeout=15000)
         await pass_input.click()
         await page.wait_for_timeout(300)
         await pass_input.fill(account["password"])
