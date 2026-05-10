@@ -1,0 +1,24 @@
+[project]
+name = "videoqa"
+version = "1.0.0"
+description = "Video QA Tester — Automated QA testing for video streaming platforms"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.40",
+    "click>=8.0",
+    "rich>=13.0",
+    "httpx>=0.25",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+    "asyncio",
+]
+
+[project.scripts]
+videoqa = "videoqa.cli.main:cli"
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"

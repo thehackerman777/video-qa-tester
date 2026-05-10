@@ -1,45 +1,28 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
-
-# Build outputs
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
 dist/
 build/
-*.tsbuildinfo
+.venv/
+venv/
 
 # Environment
 .env
 .env.local
-.env.production
+
+# Sessions
+sessions/*.json
+
+# Debug
+*.png
+*.log
 
 # IDE
 .vscode/
 .idea/
-*.iml
 *.swp
-*.swo
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Test artifacts
-test-results/
-playwright-report/
-
-# Docker
-docker-compose.override.yml
-
-# KMP
-packages/kmp-client/build/
-packages/kmp-client/local.properties
-packages/kmp-client/.gradle/
-
-# Runtime
-*.pid
-*.seed
