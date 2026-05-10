@@ -19,7 +19,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from videoqa.core.session_manager import SessionManager, ChannelScanner, ViewDistributor
+from videoqa.core.session_manager import SessionManager, ChannelScanner, ViewDistributor, JobManager
 
 # ============================================================
 # Logging
@@ -243,9 +243,14 @@ async def run_test(url: str = Form(...), watch_time: int = Form(45), count: int 
 
 
 @app.post("/api/test/distribute")
-async def distribute_views(channel: str = Form(...), total_views: int = Form(20), top_videos: int = Form(10)):
+async def distribute_views(
+    channel: str = Form(...), 
+    total_views: int = Form(20), 
+    top_videos: int = Form(10),
+    time_limit: int = Form(None)
+):
     task_id = uuid.uuid4().hex[:8]
-    logger.info(f"Distribute {total_views} views across top {top_videos} of {channel}")
+    logger.info(f"Distribute {total_views} views across top {top_videos} of {channel} (limit: {time_limit}m)")
 
     async def run():
         try:
@@ -256,18 +261,71 @@ async def distribute_views(channel: str = Form(...), total_views: int = Form(20)
                 v["views"] = scanner.extract_view_count(v.get("meta", ""))
             videos.sort(key=lambda v: v["views"], reverse=True)
             videos = videos[:top_videos]
-            results = await distributor.distribute_views(videos, total_views)
+            
+            # Pasamos task_id y time_limit al nuevo motor
+            results = await distributor.distribute_views(
+                videos, 
+                total_views=total_views,
+                job_id=task_id,
+                time_limit_minutes=time_limit
+            )
+            
             test_results.append({"id": task_id, "channel": channel, "timestamp": datetime.now().isoformat(),
                                  "type": "distribute", "results": results,
                                  "passed": sum(1 for r in results if r.get("success")),
                                  "failed": sum(1 for r in results if not r.get("success"))})
             save_results(test_results)
             logger.info(f"Distribute {task_id}: {test_results[-1]['passed']}/{total_views} succeeded")
+        except Exception as e:
+            logger.error(f"Error in distribute: {e}")
         finally:
             running_tasks.pop(task_id, None)
 
     running_tasks[task_id] = asyncio.create_task(run())
     return JSONResponse({"status": "started", "task_id": task_id})
+
+
+@app.get("/api/jobs/{job_id}/status")
+async def get_job_status(job_id: str):
+    job = JobManager.get_job(job_id)
+    if job:
+        return JSONResponse({"status": "ok", "job": job})
+    return JSONResponse({"status": "not_found", "message": "Job not found"}, status_code=404)
+
+
+# --- Favoritos ---
+FAVS_FILE = Path("data/favorites.json")
+FAVS_FILE.parent.mkdir(exist_ok=True)
+
+def load_favorites():
+    if FAVS_FILE.exists():
+        try:
+            return json.loads(FAVS_FILE.read_text())
+        except:
+            return []
+    return []
+
+def save_favorites(favs):
+    FAVS_FILE.write_text(json.dumps(favs, indent=2))
+
+@app.get("/api/favorites")
+async def get_favorites():
+    return JSONResponse({"status": "ok", "favorites": load_favorites()})
+
+@app.post("/api/favorites")
+async def add_favorite(url: str = Form(...), title: str = Form(...)):
+    favs = load_favorites()
+    if not any(f["url"] == url for f in favs):
+        favs.append({"id": uuid.uuid4().hex[:8], "url": url, "title": title})
+        save_favorites(favs)
+    return JSONResponse({"status": "ok", "favorites": favs})
+
+@app.delete("/api/favorites/{fav_id}")
+async def delete_favorite(fav_id: str):
+    favs = load_favorites()
+    favs = [f for f in favs if f["id"] != fav_id]
+    save_favorites(favs)
+    return JSONResponse({"status": "ok", "favorites": favs})
 
 
 # ============================================================

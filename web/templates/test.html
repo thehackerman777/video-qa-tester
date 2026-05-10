@@ -18,15 +18,44 @@
 
     <div class="col card">
         <h2>📊 Distribute Views</h2>
-        <form hx-post="/api/test/distribute" hx-target="#dist-result" hx-indicator="#dist-spin">
-            <div class="mb-2"><label>Channel</label><input type="text" name="channel" id="dist-channel" placeholder="@elpepe8659"></div>
-            <div class="row">
+        <form id="dist-form" hx-post="/api/test/distribute" hx-target="#dist-result" hx-indicator="#dist-spin">
+            <div class="mb-2">
+                <label>Channel / Videos</label>
+                <div class="row">
+                    <input type="text" name="channel" id="dist-channel" placeholder="@elpepe8659" style="flex:1" required>
+                    <button type="button" class="btn" onclick="saveFav()" title="Save to Favorites">⭐</button>
+                </div>
+            </div>
+            <div class="row mb-2">
                 <div style="flex:1"><label>Total Views</label><input type="number" name="total_views" value="20"></div>
                 <div style="flex:1"><label>Top N Videos</label><input type="number" name="top_videos" value="10"></div>
+                <div style="flex:1"><label>Time Limit (min)</label><input type="number" name="time_limit" placeholder="Auto"></div>
             </div>
-            <button type="submit" class="btn btn-orange mt-2"><span id="dist-spin" class="spinner hidden"></span> 🚀 Start</button>
+            <button type="submit" class="btn btn-orange mt-2"><span id="dist-spin" class="spinner hidden"></span> 🚀 Start Job</button>
         </form>
-        <div id="dist-result" class="mt-2"></div>
+        <div id="dist-result" class="mt-2 text-sm text-muted"></div>
+        
+        <!-- Live Progress UI -->
+        <div id="progress-container" class="mt-3" style="display:none; background:#1e1e1e; padding:15px; border-radius:8px; border:1px solid #333;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <strong><span id="v-status" style="color:var(--primary)">RUNNING</span></strong>
+                <span class="text-sm text-muted">Workers Activos: <span id="v-workers" style="color:white;font-weight:bold;">0</span></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:12px;">
+                <span>Progreso: <span id="v-completed">0</span> / <span id="v-total">0</span></span>
+                <span>Fallos: <span id="v-failed" style="color:#ff4a4a">0</span></span>
+            </div>
+            <div style="width:100%; background:#111; border-radius:4px; height:12px; overflow:hidden;">
+                <div id="v-bar" style="width:0%; background:var(--primary); height:100%; transition: width 0.4s ease;"></div>
+            </div>
+            <div id="v-errors" class="text-sm mt-2" style="color:#ff4a4a; max-height:60px; overflow-y:auto;"></div>
+        </div>
+        
+        <!-- Favorites -->
+        <div class="mt-4">
+            <h4>⭐ Favoritos</h4>
+            <div id="fav-list" class="text-sm mt-2"></div>
+        </div>
     </div>
 </div>
 
@@ -49,4 +78,83 @@
     <div class="text-center text-muted" style="padding:40px">No results yet</div>
     {% endif %}
 </div>
+</div>
+
+<script>
+    // Interceptar HTMX para polling
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.elt.id === "dist-form" || evt.detail.elt.closest("#dist-form")) {
+            try {
+                let res = JSON.parse(evt.detail.xhr.response);
+                if (res.task_id) {
+                    startPolling(res.task_id);
+                    document.getElementById("dist-result").innerText = "Job started: " + res.task_id;
+                }
+            } catch(e){}
+        }
+    });
+
+    let pollInterval = null;
+    function startPolling(taskId) {
+        if(pollInterval) clearInterval(pollInterval);
+        document.getElementById("progress-container").style.display = "block";
+        document.getElementById("dist-result").style.display = "none";
+        
+        pollInterval = setInterval(() => {
+            fetch("/api/jobs/" + taskId + "/status")
+                .then(r => r.json())
+                .then(data => {
+                    if(data.status === "ok") {
+                        let job = data.job;
+                        document.getElementById("v-total").innerText = job.total_views;
+                        document.getElementById("v-completed").innerText = job.completed_views;
+                        document.getElementById("v-failed").innerText = job.failed_views;
+                        document.getElementById("v-workers").innerText = job.active_workers;
+                        document.getElementById("v-status").innerText = job.status;
+                        
+                        let pct = ( (job.completed_views + job.failed_views) / job.total_views ) * 100;
+                        document.getElementById("v-bar").style.width = pct + "%";
+                        
+                        if(job.errors && job.errors.length > 0) {
+                            document.getElementById("v-errors").innerHTML = job.errors.map(e => `<div>❌ ${e}</div>`).join("");
+                        }
+
+                        if(job.status === "COMPLETED" || job.status === "FAILED") {
+                            clearInterval(pollInterval);
+                            setTimeout(() => location.reload(), 3000); // refresh list
+                        }
+                    }
+                });
+        }, 1500);
+    }
+
+    // Favoritos
+    function loadFavs() {
+        fetch("/api/favorites").then(r=>r.json()).then(d => {
+            let html = "";
+            d.favorites.forEach(f => {
+                html += `<div style="display:flex; justify-content:space-between; background:#1a1a1a; padding:5px 10px; margin-bottom:5px; border-radius:4px;">
+                    <a href="#" onclick="document.getElementById('dist-channel').value='${f.url}';return false;" style="color:var(--primary);text-decoration:none;">${f.title}</a>
+                    <a href="#" onclick="deleteFav('${f.id}');return false;" style="color:#ff4a4a;text-decoration:none;">✖</a>
+                </div>`;
+            });
+            document.getElementById("fav-list").innerHTML = html;
+        });
+    }
+
+    function saveFav() {
+        let url = document.getElementById("dist-channel").value;
+        if(!url) return;
+        let fd = new FormData();
+        fd.append("url", url);
+        fd.append("title", url.split("/").pop());
+        fetch("/api/favorites", {method:"POST", body:fd}).then(()=>loadFavs());
+    }
+
+    function deleteFav(id) {
+        fetch("/api/favorites/" + id, {method:"DELETE"}).then(()=>loadFavs());
+    }
+
+    document.addEventListener("DOMContentLoaded", loadFavs);
+</script>
 {% endblock %}
