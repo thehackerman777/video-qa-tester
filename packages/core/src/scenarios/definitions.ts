@@ -245,5 +245,6 @@ export const DEFAULT_SCENARIOS: TestScenario[] = [
   resolutionHopperScenario,
   antiAbuseTriggerScenario,
   subscribeJourneyScenario,
+  viewCountingScenario,
   quickLoadScenario,
 ];
