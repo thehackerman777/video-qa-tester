@@ -336,6 +336,9 @@ export class ScenarioRunner {
     }
 
     await this.page.waitForTimeout(1000);
+
+    // Collect current video metrics after play action
+    await this.collectVideoMetrics();
   }
 
   private async pauseVideo(): Promise<void> {
