@@ -1,0 +1,48 @@
+FROM python:3.11-slim
+
+# Install Chrome + dependencies (real browser, no headless shell)
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg \
+    xvfb \
+    x11vnc \
+    fluxbox \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    libatspi2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Google Chrome (real browser, not headless shell)
+RUN wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && apt-get install -y /tmp/chrome.deb \
+    && rm /tmp/chrome.deb
+
+# Install Python deps
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy app
+COPY videoqa/ videoqa/
+COPY scripts/ scripts/
+
+# Xvfb startup script
+RUN echo '#!/bin/bash\n\
+Xvfb :99 -screen 0 1920x1080x24 &\n\
+sleep 1\n\
+export DISPLAY=:99\n\
+exec python3 -m videoqa.cli.main test "$VIDEO_URL" --watch-time "$WATCH_TIME" --headed\n\
+' > /app/run.sh && chmod +x /app/run.sh
+
+CMD ["/app/run.sh"]

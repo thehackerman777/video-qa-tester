@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  # Browser instances — escala con --scale browser=N
+  browser:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.browser
+    environment:
+      - VIDEO_URL=${VIDEO_URL:-https://www.youtube.com/watch?v=YOUR_VIDEO}
+      - WATCH_TIME=${WATCH_TIME:-40}
+      - HEADLESS=false
+      - DISPLAY=:99
+      - PROXY=${PROXY:-}
+    volumes:
+      - browser-profiles:/app/profiles
+      - /dev/shm:/dev/shm
+    shm_size: 2gb
+    deploy:
+      replicas: ${BROWSER_COUNT:-1}
+      resources:
+        limits:
+          memory: 1.5g
+          cpus: "0.5"
+
+  # Proxy rotator (Rust)
+  proxy-rotator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.proxy
+    ports:
+      - "1080:1080"
+    environment:
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - PROXY_POOL_SIZE=${PROXY_POOL_SIZE:-10}
+    volumes:
+      - proxy-state:/app/state
+
+volumes:
+  browser-profiles:
+  proxy-state:
