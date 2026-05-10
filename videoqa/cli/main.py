@@ -24,6 +24,7 @@ from rich import box
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from videoqa.core.browser import UndetectedYouTubeBrowser
+from videoqa.core.interceptor import ForcedYouTubeBrowser
 
 console = Console()
 
@@ -235,6 +236,56 @@ def run_multi(url, count, watch_time, headed, proxy, debug):
         console.print(table)
 
     asyncio.run(run_all())
+
+
+@cli.command()
+@click.argument("url")
+@click.option("--headed/--headless", default=False)
+def inject(url, headed):
+    """API interceptor — bypass LOGIN_REQUIRED by modifying YouTube API response."""
+    async def run():
+        browser = ForcedYouTubeBrowser(headless=not headed)
+        console.print(Panel.fit(
+            f"[bold]💉 API Interceptor Mode[/bold]\n\n"
+            f"  URL: {url}",
+            border_style="green"
+        ))
+
+        try:
+            page = await browser.start_with_api_intercept()
+            console.print("1. Interceptor active, navigating...")
+            await browser.navigate(url, 3)
+
+            state = await page.evaluate('''() => {
+                const v = document.querySelector("video");
+                return {
+                    hasVideo: !!v,
+                    networkState: v ? ["Empty","Idle","Loading","Loaded"][v.networkState] : null,
+                    readyState: v ? ["HaveNothing","HaveMetadata","HaveCurrentData","HaveFutureData","HaveEnoughData"][v.readyState] : null,
+                    src: v?.src ? "yes" : "no",
+                };
+            }''')
+            console.print(f"2. State: {json.dumps(state, indent=2)}")
+
+            console.print("3. Attempting playback...")
+            played = await browser.play_video()
+            console.print(f"   {'[green]✓[/green]' if played else '[red]✗[/red]'} Playing: {played}")
+
+            await browser.screenshot()
+            console.print("4. Waiting 10s...")
+
+            before = await page.evaluate('() => { const v = document.querySelector("video"); return v ? v.currentTime : 0; }')
+            await page.wait_for_timeout(10000)
+            after = await page.evaluate('() => { const v = document.querySelector("video"); return v ? v.currentTime : 0; }')
+
+            diff = after - before
+            console.print(f"5. Time: {before:.1f}s → {after:.1f}s (progress: {diff:.1f}s) {'[green]✓[/green]' if diff > 3 else '[red]✗[/red]'}")
+            console.print(f"   Screenshot: /tmp/yt-debug.png")
+
+        finally:
+            await browser.close()
+
+    asyncio.run(run())
 
 
 async def run_instance(browser, url, watch_time, debug, idx) -> bool:
