@@ -1,102 +1,179 @@
-# 🎬 Video QA Tester (Python)
+# 🎬 Video QA Tester — Sistema Completo
 
-**Automated QA testing for YouTube — genera vistas reales en tus propios videos.**
+**QA automation para YouTube. Genera vistas reales en tus propios videos usando sesiones autenticadas.**
 
 ## ✨ Features
 
-- **Login + sesión persistente** — Loguéate una vez, el sistema guarda las cookies
-- **Reproducción real** — Video.play() + 45s de watch time para contar vistas
-- **Anti-detección** — Elimina navegator.webdriver, plugins, chrome.runtime falso
-- **Multi-instancia** — Corre N sesiones simultáneas
-- **Docker** — Aislamiento por contenedor
-- **Debug** — Screenshots, estado del player, errores de consola
+| Feature | Descripción |
+|---------|-------------|
+| 🎬 **Reproducción real** | Navega, hace clic, reproduce 45s+ — cuenta vistas reales |
+| 🔑 **Sesiones autenticadas** | Cookies de YouTube reales → bypassea LOGIN_REQUIRED |
+| 👥 **Multi-sesión** | Cada perfil = un "usuario" diferente con sus cookies |
+| 📡 **Channel Scanner** | Encuentra videos ordenados por popularidad |
+| 📊 **Distribuidor** | Asigna N vistas entre los Top M videos |
+| 🛡️ **Anti-detección** | Elimina webdriver, plugins falsos, perfiles persistentes |
+| 🔍 **Debug** | Screenshots, estado del player, playability status |
 
-## 🚀 Quick Start (Guía paso a paso)
+## 🚀 WORKFLOW COMPLETO
 
-### 0. Setup
+### 1. Setup inicial (una vez)
+
 ```bash
-# En el dev-vps
+# En el servidor (dev-vps)
 cd /home/ubuntu/video-qa-tester
 source .venv/bin/activate
-pip install -r requirements.txt
+
+# Verificar
+python3 -m videoqa.cli.main --help
+```
+
+### 2. Exportar cookies frescas desde tu PC
+
+En tu **PC Linux donde tienes Chrome con sesión de YouTube**:
+
+```bash
+pip install playwright
 python3 -m playwright install chromium
+
+cat > export_cookies.py << 'EOF'
+import asyncio
+from playwright.sync_api import sync_playwright
+import json
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=False, channel="chrome")
+    context = browser.new_context()
+    page = context.new_page()
+    page.goto("https://www.youtube.com")
+    input("¿Logueado en YouTube? Presiona Enter...")
+    
+    cookies = context.cookies()
+    with open("cookies_frescas.txt", "w") as f:
+        f.write("# Netscape HTTP Cookie File\n")
+        for c in cookies:
+            f.write(f"{c['domain']}\tTRUE\t{c['path']}\t{'TRUE' if c['secure'] else 'FALSE'}\t{int(c.get('expires', 0))}\t{c['name']}\t{c['value']}\n")
+    
+    print(f"✅ {len(cookies)} cookies exportadas a cookies_frescas.txt")
+    browser.close()
+EOF
+
+python3 export_cookies.txt
+# → Se abre Chrome, ve a YouTube (debe estar logueado)
+# → Enter en terminal
+# → Se genera cookies_frescas.txt
 ```
 
-### 1. Crear cuenta Google de testing
-
-Hazlo en tu navegador normal (NO en el servidor):
-1. Ve a https://accounts.google.com/SignUp
-2. Crea una cuenta nueva (ej: `micanal.testing.1@gmail.com`)
-3. Pon tu celular para verificar
-4. Ve a YouTube, suscríbete a tu canal, da like a un video
-
-Guarda el email y contraseña.
-
-### 2. Login en nuestro sistema
+### 3. Subir cookies al servidor
 
 ```bash
-# En el dev-vps, edita las credenciales:
-nano .yt-credentials.json
-
-# Pon tu email y contraseña ahí
-# Luego ejecuta (se abrirá Chrome visible):
-python3 scripts/auto_login.py
+# En tu PC:
+scp cookies_frescas.txt ubuntu@18.213.174.229:~/video-qa-tester/
 ```
 
-Te aparecerá Chrome, Google hará login automáticamente.
-Si pide 2FA/captcha, resuélvelo manualmente.
-**Las cookies se guardan automáticamente.**
-
-### 3. Probar reproducción
+### 4. Importar sesión en el servidor
 
 ```bash
-# Con sesión guardada, prueba un video:
+# En el dev-vps:
+cd video-qa-tester
+source .venv/bin/activate
+
+# Importar como sesión
+python3 -m videoqa.cli.main sessions import-cookies cookies_frescas.txt
+
+# Verificar
+python3 -m videoqa.cli.main sessions list
+```
+
+### 5. Probar reproducción
+
+```bash
+# Test básico — un solo video
 python3 -m videoqa.cli.main test "https://www.youtube.com/watch?v=Wf_q_N7GmGQ" --watch-time 45
 ```
 
-### 4. Múltiples instancias
+### 6. Escanear canal + distribuir vistas
 
 ```bash
-# 10 sesiones viendo el mismo video:
-python3 -m videoqa.cli.main test "https://www.youtube.com/watch?v=Wf_q_N7GmGQ" --count 10 --watch-time 45
+# Escanear canal (top 20 videos por popularidad)
+python3 -m videoqa.cli.main scan "@elpepe8659"
+
+# Distribuir 20 vistas entre los top 10 videos
+python3 -m videoqa.cli.main distribute "@elpepe8659" --views 20 --top 10
 ```
 
-## 📋 Comandos
+## 📋 COMANDOS
 
 | Comando | Descripción |
 |---------|-------------|
-| `test <url>` | Reproduce un video (single o multi-instancia) |
-| `scan <channel>` | Descubre videos de un canal |
+| `test <url>` | Reproduce un video (single) |
+| `scan <channel>` | Escanea canal, muestra top videos |
+| `distribute <channel>` | Distribuye N vistas entre top videos |
+| `sessions list` | Lista sesiones disponibles |
+| `sessions import-cookies <file>` | Importa cookies |
+| `sessions import-batch --pattern` | Importa múltiples archivos |
 | `debug <url>` | Debug detallado del player |
-| `inject <url>` | Modo interceptor de API (experimental) |
+| `login` | Login interactivo |
 
-## 🔬 Qué hace el sistema
-
-1. **Navega** al video en YouTube
-2. **Click** en el player
-3. **video.play()** con muted=true
-4. **Espera 45s** (umbral de vista de YouTube)
-5. **Verifica** que el tiempo avance
-6. **Guarda** las cookies para reuso
-
-## 📁 Estructura
+## 🔬 ARQUITECTURA
 
 ```
-videoqa/
-├── core/
-│   ├── browser.py      # Browser anti-detección + sesiones
-│   ├── interceptor.py  # Interceptor de API YouTube
-│   └── types.py
-├── cli/
-│   └── main.py         # Todos los comandos
-scripts/
-├── auto_login.py       # Login automático con guardado de sesión
-├── proxy-rotator/      # Rotador de proxies en Rust
+cookies_frescas.txt  →  sessions import-cookies  →  profiles/session-N/cookies.json
+                                                          ↓
+scan @channel  →  top_videos.json  →  distribute --views 20  →  cada sesión ve 1 video
 ```
 
-## 🔧 Requisitos
+Cada sesión (cookies) = 1 usuario diferente.
+Cada usuario ve 1 video por 45s.
+Con 20 sesiones y 10 videos = 20 vistas distribuidas naturalmente.
 
-- Python 3.11+
-- Playwright + Chromium
-- **Cuenta Google** (para bypassear LOGIN_REQUIRED)
-- Docker (para multi-instancia aislada)
+## 🛡️ ANTI-DETECCIÓN
+
+- `navigator.webdriver` → `undefined`
+- `navigator.plugins` → array realista (PDF, PDF Viewer, Native Client)
+- `window.chrome` → objeto runtime completo
+- Canvas fingerprint → consistente por sesión
+- Perfil persistente → historial, cookies, localStorage
+- User-Agent rotatorio por sesión
+- Viewport aleatorio por sesión
+- Timezone/locale aleatorio
+
+## 🔧 SOLUCIÓN DE PROBLEMAS
+
+| Síntoma | Causa | Solución |
+|---------|-------|----------|
+| `LOGIN_REQUIRED` | Cookies expiradas | Exportar cookies frescas |
+| `Time: 0.0s` | Stream no cargado | Verificar sesión o esperar |
+| `networkState: Empty` | IP bloqueada | Usar cuenta autenticada |
+| No views in Studio | Watch time < 30s | Usar --watch-time 45 |
+
+## 📂 ESTRUCTURA
+
+```
+video-qa-tester/
+├── videoqa/
+│   ├── core/
+│   │   ├── browser.py          # Browser anti-detección + sesiones
+│   │   ├── session_manager.py  # Gestor multi-sesión + distribuidor
+│   │   ├── interceptor.py      # Interceptor API (experimental)
+│   │   └── types.py
+│   └── cli/
+│       └── main.py             # Todos los comandos CLI
+├── profiles/                   # Sesiones guardadas (gitignored)
+│   └── session-N/
+│       └── cookies.json
+├── scripts/
+│   └── auto_login.py
+├── requirements.txt
+└── README.md
+```
+
+## 📊 MÉTRICAS ESPERADAS
+
+| Recurso | Por sesión | 20 sesiones | 50 sesiones |
+|---------|-----------|-------------|-------------|
+| RAM | ~300MB | ~6GB | ~15GB |
+| Tiempo/vista | ~60s | ~60s total | ~60s total |
+| Vistas/minuto | 1 | 20 | 50 |
+| IPs | 1 | 1-20* | 1-50* |
+
+*Con múltiples proxies
