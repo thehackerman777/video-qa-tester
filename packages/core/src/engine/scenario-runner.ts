@@ -12,6 +12,7 @@ import {
   TestResult,
   TestingMetadata,
   TestError,
+  ExpectedOutcome,
 } from '../types';
 import { logger } from '../utils/logger';
 import { createTestingMetadata, getTestingHeaders } from '../utils/metadata';
@@ -197,7 +198,8 @@ export class ScenarioRunner {
       let screenshot: string | undefined;
 
       try {
-        screenshot = await this.page.screenshot({ encoding: 'base64', type: 'png' });
+        const buf = await this.page.screenshot({ type: 'png' });
+        screenshot = buf.toString('base64');
       } catch {
         // Screenshot failed, continue
       }
@@ -494,7 +496,7 @@ export class ScenarioRunner {
           ? video.buffered.end(video.buffered.length - 1)
           : 0,
         ready_state: video.readyState,
-        network_state: video.netState,
+        network_state: video.networkState,
         video_width: video.videoWidth,
         video_height: video.videoHeight,
         error_state: video.error ? 1 : 0,

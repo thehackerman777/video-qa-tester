@@ -45,6 +45,9 @@ import { chromium, Browser, Page } from 'playwright';
 import { TestScenario, TestResult, PlatformConfig, BehaviorConfig, TestingMetadata } from './types';
 import { ScenarioRunner } from './engine/scenario-runner';
 import { BrowserPool } from './engine/browser-pool';
+import { MetricsCollector } from './metrics/collector';
+import { AntiAbuseTester } from './antiabuse/tester';
+import { AnalyticsValidator } from './analytics/validator';
 import { createTestingMetadata } from './utils/metadata';
 import { logger } from './utils/logger';
 
