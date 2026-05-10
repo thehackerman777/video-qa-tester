@@ -1,0 +1,104 @@
+# ============================================================
+# Video QA Tester — Prometheus Alert Rules
+# ============================================================
+
+groups:
+  - name: videoqa-alerts
+    interval: 30s
+    rules:
+      # === Error Rate Alerts ===
+
+      - alert: HighErrorRate
+        expr: |
+          rate(videoqa_errors_total[5m]) / rate(videoqa_tests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'High error rate detected ({{ $value | humanizePercentage }})'
+          description: 'Error rate is above 5% threshold for the last 2 minutes'
+
+      - alert: CriticalErrorRate
+        expr: |
+          rate(videoqa_errors_total[5m]) / rate(videoqa_tests_total[5m]) > 0.20
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Critical error rate ({{ $value | humanizePercentage }})'
+          description: 'Error rate exceeded 20% — immediate investigation required'
+
+      # === Queue Health ===
+
+      - alert: QueueBacklog
+        expr: videoqa_queue_depth > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Queue backlog ({{ $value }} pending jobs)'
+          description: 'Test queue has {{ $value }} pending jobs for > 2 minutes'
+
+      - alert: QueueStarvation
+        expr: videoqa_queue_depth == 0 AND videoqa_workers_active > 0
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: 'Workers idle — no queued jobs'
+          description: '{{ $value }} workers active but queue is empty'
+
+      # === Worker Health ===
+
+      - alert: WorkerDown
+        expr: videoqa_workers_active < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'No active workers'
+          description: 'All workers are offline — tests cannot be processed'
+
+      - alert: WorkerCascadeFailure
+        expr: |
+          changes(videoqa_workers_active[2m]) < 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Workers failing in cascade'
+          description: 'Multiple workers went offline within 2 minutes'
+
+      # === Performance ===
+
+      - alert: SlowTests
+        expr: |
+          histogram_quantile(0.99, rate(videoqa_test_duration_seconds_bucket[5m])) > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'P99 test duration exceeds 120 seconds'
+          description: 'Tests are taking too long — possible platform degradation'
+
+      - alert: ThroughputDrop
+        expr: |
+          rate(videoqa_tests_total[5m]) < rate(videoqa_tests_total[30m]) * 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Test throughput dropped by > 50%'
+          description: 'Test execution rate dropped significantly'
+
+      # === Resource Alerts ===
+
+      - alert: HighMemoryUsage
+        expr: |
+          node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Low memory available ({{ $value | humanizePercentage }})'
+          description: 'Less than 10% memory available on server'

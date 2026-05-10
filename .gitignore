@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# Docker
+docker-compose.override.yml
+
+# KMP
+packages/kmp-client/build/
+packages/kmp-client/local.properties
+packages/kmp-client/.gradle/
+
+# Runtime
+*.pid
+*.seed

@@ -1,0 +1,38 @@
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace
+COPY package.json tsconfig.base.json ./
+COPY packages/core packages/core
+COPY services/orchestrator services/orchestrator
+
+# Install dependencies
+RUN npm install --workspaces
+
+# Build
+RUN npm run build -w packages/core && \
+    npm run build -w services/orchestrator
+
+# Production image
+FROM node:20-slim
+
+WORKDIR /app
+
+# Copy built artifacts
+COPY --from=builder /app/packages/core/dist ./packages/core/dist
+COPY --from=builder /app/packages/core/package.json ./packages/core/
+COPY --from=builder /app/services/orchestrator/dist ./services/orchestrator/dist
+COPY --from=builder /app/services/orchestrator/package.json ./services/orchestrator/
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+
+EXPOSE 3000
+
+CMD ["node", "services/orchestrator/dist/index.js"]
