@@ -1,91 +1,191 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video QA Tester</title>
     <script src="https://unpkg.com/htmx.org@1.9.11"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        dark: { 900: '#0f0f1a', 800: '#1a1a2e', 700: '#252540', 600: '#2d2d50' }
-                    }
-                }
-            }
-        }
-    </script>
+    <link href="https://fonts.cdnfonts.com/css/inter" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', system-ui, sans-serif; }
-        .glass { background: rgba(26,26,46,0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
-        .btn { @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm; }
-        .btn-primary { @apply bg-indigo-600 hover:bg-indigo-500 text-white; }
-        .btn-success { @apply bg-emerald-600 hover:bg-emerald-500 text-white; }
-        .btn-warning { @apply bg-amber-600 hover:bg-amber-500 text-white; }
-        .btn-danger { @apply bg-red-600 hover:bg-red-500 text-white; }
-        .input { @apply w-full px-3 py-2 rounded-lg bg-dark-700 border border-dark-600 text-gray-200 focus:border-indigo-500 focus:outline-none; }
-        .card { @apply glass rounded-xl p-4; }
-        .badge { @apply px-2 py-0.5 rounded-full text-xs font-medium; }
-        .tab { @apply px-4 py-2 rounded-lg text-sm cursor-pointer transition-colors; }
-        .tab.active { @apply bg-indigo-600 text-white; }
-        .tab:not(.active) { @apply text-gray-400 hover:text-white hover:bg-dark-600; }
+        :root {
+            --color-midnight-graphite: #202020;
+            --color-canvas-white: #ffffff;
+            --color-slate-mist: #efefef;
+            --color-cloud-whisper: #f5f5f5;
+            --color-warm-ivory: #ebe6dd;
+            --color-dark-shale: #4d4d4d;
+            --color-silver-ash: #828282;
+            --color-light-pearl: #e8e8e8;
+            --color-sunset-orange: #ff682c;
+            --color-data-gold: #816729;
+            --font-inter: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            --radius-cards: 8px;
+            --radius-buttons: 20px;
+            --card-padding: 40px;
+            --section-gap: 80px;
+            --element-gap: 20px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: var(--font-inter);
+            background: var(--color-canvas-white);
+            color: var(--color-midnight-graphite);
+            font-size: 15px;
+            line-height: 1.33;
+        }
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 240px;
+            background: var(--color-canvas-white);
+            border-right: 1px solid var(--color-light-pearl);
+            padding: var(--card-padding) var(--spacing-20);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-brand {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: var(--spacing-36);
+            padding: 0 var(--spacing-12);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sidebar-brand span { color: var(--color-sunset-orange); }
+        .nav-link {
+            display: block;
+            padding: var(--spacing-8) var(--spacing-12);
+            color: var(--color-silver-ash);
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: 400;
+            border-radius: var(--radius-lg);
+            transition: all 0.15s;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: var(--color-midnight-graphite);
+            background: var(--color-slate-mist);
+            border-bottom: 2px solid var(--color-midnight-graphite);
+        }
+        .content { flex: 1; padding: var(--spacing-40); max-width: 1200px; }
+        h1 { font-size: 32px; font-weight: 400; letter-spacing: -0.64px; margin-bottom: var(--spacing-36); }
+        h2 { font-size: 18px; font-weight: 500; margin-bottom: var(--spacing-20); color: var(--color-dark-shale); }
+        .card {
+            background: var(--color-slate-mist);
+            border-radius: var(--radius-cards);
+            padding: var(--card-padding);
+            margin-bottom: var(--element-gap);
+        }
+        .card-light {
+            background: var(--color-cloud-whisper);
+            border-radius: var(--radius-cards);
+            padding: var(--spacing-20);
+        }
+        .row { display: flex; gap: var(--element-gap); flex-wrap: wrap; }
+        .col { flex: 1; min-width: 200px; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 40px; font-weight: 400; letter-spacing: -0.8px; }
+        .stat-label { font-size: 15px; color: var(--color-silver-ash); }
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 0 18px; height: 40px;
+            background: transparent;
+            color: var(--color-midnight-graphite);
+            border: none; border-bottom: 2px solid var(--color-midnight-graphite);
+            border-radius: var(--radius-buttons);
+            font-family: var(--font-inter); font-size: 15px; font-weight: 400;
+            cursor: pointer; transition: all 0.15s;
+            text-decoration: none;
+        }
+        .btn:hover { background: var(--color-slate-mist); }
+        .btn-sm { height: 32px; font-size: 13px; padding: 0 12px; }
+        .btn-orange { border-bottom-color: var(--color-sunset-orange); color: var(--color-sunset-orange); }
+        .btn-orange:hover { background: #fff5f0; }
+        input, select, textarea {
+            width: 100%; padding: 10px 16px;
+            border: 1px solid var(--color-light-pearl);
+            border-radius: var(--radius-buttons);
+            font-family: var(--font-inter); font-size: 14px;
+            background: var(--color-canvas-white);
+            color: var(--color-midnight-graphite);
+            transition: border-color 0.15s;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--color-midnight-graphite); }
+        label { display: block; font-size: 13px; color: var(--color-dark-shale); margin-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; font-size: 13px; color: var(--color-silver-ash); font-weight: 500; padding: 8px 4px; border-bottom: 1px solid var(--color-light-pearl); }
+        td { padding: 10px 4px; border-bottom: 1px solid var(--color-light-pearl); font-size: 14px; }
+        tr:hover { background: rgba(0,0,0,0.02); }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 12px; }
+        .badge-green { background: #e8f5e9; color: #2e7d32; }
+        .badge-red { background: #fbe9e7; color: #c62828; }
+        .badge-amber { background: #fff8e1; color: #f57f17; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--element-gap); }
+        .mt-2 { margin-top: var(--spacing-8); }
+        .mt-4 { margin-top: var(--spacing-20); }
+        .mb-2 { margin-bottom: var(--spacing-8); }
+        .mb-4 { margin-bottom: var(--spacing-20); }
+        .text-sm { font-size: 13px; }
+        .text-muted { color: var(--color-silver-ash); }
+        .text-accent { color: var(--color-sunset-orange); }
+        .flex { display: flex; }
+        .flex-1 { flex: 1; }
+        .gap-2 { gap: var(--spacing-8); }
+        .gap-4 { gap: var(--element-gap); }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+        .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #1a1a2e; }
-        ::-webkit-scrollbar-thumb { background: #2d2d50; border-radius: 3px; }
-        .skeleton { animation: pulse 2s infinite; @apply bg-dark-600 rounded; }
-        @keyframes pulse { 0%,100% { opacity: 0.4 } 50% { opacity: 0.8 } }
-        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #6366f1; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
-        @keyframes spin { to { transform: rotate(360deg) } }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--color-light-pearl); border-radius: 3px; }
+        .spinner { width: 16px; height: 16px; border: 2px solid var(--color-light-pearl); border-top-color: var(--color-sunset-orange); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .log-box {
+            background: var(--color-midnight-graphite);
+            color: #b0bec5;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            padding: var(--spacing-20);
+            border-radius: var(--radius-cards);
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .log-box .info { color: #81c784; }
+        .log-box .warn { color: #ffd54f; }
+        .log-box .error { color: #e57373; }
+        .hidden { display: none; }
+        a { color: var(--color-midnight-graphite); text-decoration: underline; }
+        a:hover { color: var(--color-sunset-orange); }
     </style>
 </head>
-<body class="bg-dark-900 text-gray-200 min-h-screen">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <nav class="w-56 bg-dark-800 border-r border-dark-600 flex flex-col p-3">
-            <div class="text-lg font-bold mb-6 px-2 flex items-center gap-2">
-                <span class="text-indigo-400">▶</span> QA Tester
-                <span class="text-xs text-gray-500 ml-auto">v1</span>
-            </div>
-            
-            <div class="flex flex-col gap-1 flex-1">
-                <a href="/" class="tab {% if page == 'dashboard' %}active{% endif %}" hx-boost="true">📊 Dashboard</a>
-                <a href="/sessions" class="tab {% if page == 'sessions' %}active{% endif %}" hx-boost="true">🔑 Sessions</a>
-                <a href="/channels" class="tab {% if page == 'channels' %}active{% endif %}" hx-boost="true">📡 Channels</a>
-                <a href="/test" class="tab {% if page == 'test' %}active{% endif %}" hx-boost="true">🧪 Tests</a>
-            </div>
+<body>
+<div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-brand"><span>▶</span> QA Tester</div>
+        <a href="/" class="nav-link {% if page == 'dashboard' %}active{% endif %}" hx-boost="true">📊 Dashboard</a>
+        <a href="/sessions" class="nav-link {% if page == 'sessions' %}active{% endif %}" hx-boost="true">🔑 Sessions</a>
+        <a href="/channels" class="nav-link {% if page == 'channels' %}active{% endif %}" hx-boost="true">📡 Channels</a>
+        <a href="/test" class="nav-link {% if page == 'test' %}active{% endif %}" hx-boost="true">🧪 Tests</a>
+        <div class="mt-4 text-sm text-muted" id="status-bar">
+            <div id="status-info">...</div>
+        </div>
+    </nav>
 
-            <div class="mt-auto pt-3 border-t border-dark-600">
-                <div class="text-xs text-gray-500 px-2" id="status-bar">
-                    <div class="flex justify-between mb-1">
-                        <span>Sessions</span>
-                        <span id="session-count">{{ sessions|length }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Running</span>
-                        <span id="task-count">{{ running }}</span>
-                    </div>
-                </div>
-            </div>
-        </nav>
+    <!-- Main -->
+    <main class="content" id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+</div>
 
-        <!-- Main -->
-        <main class="flex-1 overflow-y-auto p-6" id="main-content">
-            {% block content %}{% endblock %}
-        </main>
-    </div>
-
-    <script>
-        // Auto-refresh status
-        setInterval(() => {
-            fetch('/api/status').then(r => r.json()).then(d => {
-                document.getElementById('session-count').textContent = d.sessions;
-                document.getElementById('task-count').textContent = d.running_tasks;
-            }).catch(() => {});
-        }, 3000);
-    </script>
+<script>
+    setInterval(() => {
+        fetch('/api/status').then(r=>r.json()).then(d => {
+            document.getElementById('status-info').textContent = `${d.sessions} sessions · ${d.running_tasks} running`;
+        }).catch(() => {});
+    }, 3000);
+</script>
 </body>
 </html>

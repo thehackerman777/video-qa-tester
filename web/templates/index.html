@@ -1,76 +1,72 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-6xl mx-auto">
-    <h1 class="text-2xl font-bold mb-6">📊 Dashboard</h1>
+<div class="max-w-4xl">
+    <div class="flex justify-between items-center mb-4">
+        <h1>📊 Dashboard</h1>
+        <span class="text-sm text-muted" id="live-status"></span>
+    </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-4 gap-4 mb-8">
-        <div class="card text-center">
-            <div class="text-3xl font-bold text-indigo-400">{{ sessions|length }}</div>
-            <div class="text-sm text-gray-400">Sessions</div>
+    <div class="row mb-4">
+        <div class="col card stat">
+            <div class="stat-value text-accent">{{ sessions|length }}</div>
+            <div class="stat-label">Sessions</div>
         </div>
-        <div class="card text-center">
-            <div class="text-3xl font-bold text-emerald-400">{{ results|selectattr("passed", "gt", 0)|list|length }}</div>
-            <div class="text-sm text-gray-400">Tests Passed</div>
+        <div class="col card stat">
+            <div class="stat-value" style="color:#2e7d32">{{ results|selectattr("passed", "gt", 0)|list|length }}</div>
+            <div class="stat-label">Tests Passed</div>
         </div>
-        <div class="card text-center">
-            <div class="text-3xl font-bold text-amber-400">{{ running }}</div>
-            <div class="text-sm text-gray-400">Running</div>
+        <div class="col card stat">
+            <div class="stat-value" style="color:#c62828">{{ results|selectattr("failed", "gt", 0)|list|length }}</div>
+            <div class="stat-label">Failing</div>
         </div>
-        <div class="card text-center">
-            <div class="text-3xl font-bold text-cyan-400">{{ results|length }}</div>
-            <div class="text-sm text-gray-400">Total Runs</div>
+        <div class="col card stat">
+            <div class="stat-value">{{ results|length }}</div>
+            <div class="stat-label">Total Runs</div>
         </div>
     </div>
 
-    <!-- Quick Actions -->
-    <h2 class="text-lg font-bold mb-3">⚡ Quick Actions</h2>
-    <div class="grid grid-cols-3 gap-3 mb-8">
-        <a href="/sessions" class="card hover:bg-dark-700 transition text-center py-6" hx-boost="true">
-            <div class="text-2xl mb-1">🔑</div>
-            <div class="text-sm font-medium">Import Cookies</div>
-            <div class="text-xs text-gray-500">Add a YouTube session</div>
+    <div class="row mb-4">
+        <a href="/sessions" class="card-light col" style="text-decoration:none">
+            <div class="stat-value" style="font-size:24px">🔑</div>
+            <div style="font-weight:500">Import Cookies</div>
+            <div class="text-sm text-muted">Add a YouTube session</div>
         </a>
-        <a href="/channels" class="card hover:bg-dark-700 transition text-center py-6" hx-boost="true">
-            <div class="text-2xl mb-1">📡</div>
-            <div class="text-sm font-medium">Scan Channel</div>
-            <div class="text-xs text-gray-500">Discover videos</div>
+        <a href="/channels" class="card-light col" style="text-decoration:none">
+            <div class="stat-value" style="font-size:24px">📡</div>
+            <div style="font-weight:500">Scan Channel</div>
+            <div class="text-sm text-muted">Discover videos</div>
         </a>
-        <a href="/test" class="card hover:bg-dark-700 transition text-center py-6" hx-boost="true">
-            <div class="text-2xl mb-1">🧪</div>
-            <div class="text-sm font-medium">Run Test</div>
-            <div class="text-xs text-gray-500">Single or distribute</div>
+        <a href="/test" class="card-light col" style="text-decoration:none">
+            <div class="stat-value" style="font-size:24px">🧪</div>
+            <div style="font-weight:500">Run Tests</div>
+            <div class="text-sm text-muted">Single or distribute</div>
+        </a>
+        <a href="/logs" class="card-light col" style="text-decoration:none">
+            <div class="stat-value" style="font-size:24px">📋</div>
+            <div style="font-weight:500">Logs</div>
+            <div class="text-sm text-muted">Server debug</div>
         </a>
     </div>
 
-    <!-- Recent Results -->
-    <h2 class="text-lg font-bold mb-3">📋 Recent Results</h2>
-    <div class="card overflow-hidden">
+    <h2>Recent Results</h2>
+    <div class="card">
         {% if results %}
-        <table class="w-full text-sm">
-            <thead>
-                <tr class="text-gray-400 border-b border-dark-600">
-                    <th class="text-left py-2 px-2">Time</th>
-                    <th class="text-left py-2 px-2">Type</th>
-                    <th class="text-left py-2 px-2">Target</th>
-                    <th class="text-center py-2 px-2">Passed</th>
-                    <th class="text-center py-2 px-2">Failed</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in results[-10:]|reverse %}
-                <tr class="border-b border-dark-700 hover:bg-dark-700">
-                    <td class="py-2 px-2 text-gray-400 text-xs">{{ r.timestamp[11:19] }}</td>
-                    <td class="py-2 px-2">{{ r.get("type", "test") }}</td>
-                    <td class="py-2 px-2 truncate max-w-xs">{{ r.get("url") or r.get("channel", "") }}</td>
-                    <td class="py-2 px-2 text-center"><span class="badge bg-emerald-600/20 text-emerald-400">{{ r.passed }}</span></td>
-                    <td class="py-2 px-2 text-center"><span class="badge bg-red-600/20 text-red-400">{{ r.failed }}</span></td>
-                </tr>
-                {% endfor %}
-            </tbody>
+        <table>
+            <tr><th>Time</th><th>Type</th><th>Target</th><th>Passed</th><th>Failed</th></tr>
+            {% for r in results[-10:]|reverse %}
+            <tr>
+                <td class="text-sm text-muted">{{ r.timestamp[11:19] }}</td>
+                <td>{{ r.get("type", "test") }}</td>
+                <td class="truncate" style="max-width:300px">{{ r.get("url") or r.get("channel","") }}</td>
+                <td><span class="badge badge-green">{{ r.passed }}</span></td>
+                <td>{% if r.failed > 0 %}<span class="badge badge-red">{{ r.failed }}</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
         </table>
         {% else %}
-        <div class="text-center py-8 text-gray-500">No tests yet. Start by importing a session or scanning a channel!</div>
+        <div class="text-center text-muted" style="padding:40px 0">
+            No tests yet. Import a session or scan a channel.
+        </div>
         {% endif %}
     </div>
 </div>

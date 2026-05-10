@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl">
+    <div class="flex justify-between items-center mb-4">
+        <h1>📋 Server Logs</h1>
+        <button class="btn btn-sm" onclick="refreshLogs()">↻ Refresh</button>
+    </div>
+    <div class="log-box" id="log-content">{{ logs }}</div>
+    <div class="text-sm text-muted mt-2">Auto-refreshes every 5s. Shows last ~5000 chars.</div>
+</div>
+<script>
+    function refreshLogs() {
+        fetch('/api/logs').then(r=>r.json()).then(d => {
+            document.getElementById('log-content').textContent = d.logs;
+        }).catch(() => {});
+    }
+    setInterval(refreshLogs, 5000);
+</script>
+{% endblock %}
