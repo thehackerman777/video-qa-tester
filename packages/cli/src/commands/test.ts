@@ -56,7 +56,7 @@ export async function runTestCommand(
       const page = await context.newPage();
       const runner = new engine.runner(page, scenario.name, 'cli');
 
-      // Adapt scenario: replace placeholders with actual video URL
+      // Adapt scenario: replace placeholders
       const adaptedScenario: TestScenario = {
         ...scenario,
         actions: scenario.actions.map((action) => {
@@ -69,6 +69,15 @@ export async function runTestCommand(
               url = url.replace('{{PLATFORM_URL}}', new URL(videoUrl).origin);
             }
             return { ...action, params: { url } };
+          }
+          if (action.type === 'login') {
+            const params = { ...action.params };
+            // Use env vars for credentials, or prompt defaults
+            const ytEmail = process.env.YT_EMAIL || params.username as string;
+            const ytPass = process.env.YT_PASS || params.password as string;
+            params.username = ytEmail;
+            params.password = ytPass;
+            return { ...action, params };
           }
           return action;
         }),

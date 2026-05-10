@@ -231,47 +231,57 @@ export class ScenarioRunner {
   }
 
   private async login(username: string, password: string): Promise<void> {
-    logger.debug({ msg: 'Attempting login' });
+    logger.debug({ msg: 'Attempting Google login' });
 
-    // Try common login selectors
-    const emailInput = await this.page.$(
-      'input[type="email"], input[name="email"], input[name="identifier"], input[autocomplete="username"]'
-    );
+    // Wait for the page to settle
+    await this.page.waitForTimeout(2000);
 
-    if (!emailInput) {
-      // Click sign-in button first
-      const signInButtons = await this.page.$$(
-        'a:has-text("Sign in"), button:has-text("Sign in"), a:has-text("Log in"), button:has-text("Log in")'
-      );
+    // Google login flow: Step 1 — Enter email
+    const emailField = await this.page.waitForSelector(
+      'input[type="email"], input[name="identifier"], input[autocomplete="username"]',
+      { timeout: 10000 }
+    ).catch(() => null);
 
-      if (signInButtons.length > 0) {
-        await signInButtons[0].click();
-        await this.page.waitForTimeout(2000);
-      }
-    }
-
-    // Fill credentials
-    const usernameField = await this.page.$(
-      'input[type="email"], input[name="email"], input[name="identifier"], input[autocomplete="username"], input[name="username"]'
-    );
-
-    if (usernameField) {
-      await usernameField.fill(username);
-      await usernameField.press('Enter');
-      await this.page.waitForTimeout(2000);
-    }
-
-    const passwordField = await this.page.$(
-      'input[type="password"]'
-    );
-
-    if (passwordField) {
-      await passwordField.fill(password);
-      await passwordField.press('Enter');
+    if (emailField) {
+      logger.debug({ msg: 'Filling email' });
+      // Clear field first, then type slowly like a human
+      await emailField.click();
+      await this.page.waitForTimeout(300);
+      await emailField.fill(username);
+      await this.page.waitForTimeout(500);
+      await emailField.press('Enter');
       await this.page.waitForTimeout(3000);
     }
 
-    logger.debug({ msg: 'Login completed' });
+    // Google login flow: Step 2 — Enter password
+    const passwordField = await this.page.waitForSelector(
+      'input[type="password"], input[name="Passwd"]',
+      { timeout: 15000 }
+    ).catch(() => null);
+
+    if (passwordField) {
+      logger.debug({ msg: 'Filling password' });
+      await passwordField.click();
+      await this.page.waitForTimeout(300);
+      await passwordField.fill(password);
+      await this.page.waitForTimeout(500);
+      await passwordField.press('Enter');
+      await this.page.waitForTimeout(5000);
+    }
+
+    // Handle 2FA if needed
+    const mfaField = await this.page.$(
+      'input[type="tel"], input[name*="code"], input[autocomplete="one-time-code"]'
+    ).catch(() => null);
+
+    if (mfaField) {
+      logger.warn({ msg: '2FA detected — login may need manual intervention' });
+    }
+
+    // Wait for login to complete
+    await this.page.waitForTimeout(2000);
+
+    logger.debug({ msg: 'Login flow completed' });
   }
 
   // ============================================================

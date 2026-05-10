@@ -187,19 +187,25 @@ export const subscribeJourneyScenario: TestScenario = {
 };
 
 /**
- * Scenario 7: View Counting Test
- * Designed specifically to trigger YouTube view counting.
- * Waits ~35s which is the minimum for YouTube to register a view.
+ * Scenario 7: View Counting Test (Authenticated)
+ * Logs into YouTube first, then plays video for 35s+.
+ * Authentication avoids the "Sign in to confirm you're not a bot" block.
  */
 export const viewCountingScenario: TestScenario = {
   id: 'view-count',
   name: 'View Counting Test',
-  description: 'Navigates to video, plays for 35s+ to trigger view counting',
+  description: 'Logs in, navigates to video, plays for 35s+ to trigger view counting',
   category: 'playback',
   weight: 100,
   actions: [
+    // Step 1: Navigate to YouTube and login
+    { type: 'navigate', params: { url: 'https://accounts.google.com/Login' }, delayMs: 1000, timeoutMs: 20000 },
+    { type: 'wait', params: { ms: 3000 } },
+    { type: 'login', params: { username: '{{YT_EMAIL}}', password: '{{YT_PASS}}' }, delayMs: 2000, timeoutMs: 30000 },
+    // Step 2: Navigate to video
     { type: 'navigate', params: { url: '{{VIDEO_URL}}' }, delayMs: 1000, timeoutMs: 20000 },
     { type: 'wait', params: { ms: 5000 } },
+    // Step 3: Play
     { type: 'play', params: {}, delayMs: 1000, timeoutMs: 10000 },
     { type: 'wait', params: { ms: 35000 } },  // 35s = YouTube view threshold
     { type: 'pause', params: {}, delayMs: 1000 },
