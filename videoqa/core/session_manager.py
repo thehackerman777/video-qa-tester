@@ -237,6 +237,53 @@ class ChannelScanner:
         return 0
 
 
+class JobManager:
+    """Mantiene el estado de las tareas de distribución para la UI."""
+    _jobs = {}
+
+    @classmethod
+    def create_job(cls, job_id, total_views):
+        cls._jobs[job_id] = {
+            "id": job_id,
+            "status": "RUNNING",
+            "total_views": total_views,
+            "completed_views": 0,
+            "failed_views": 0,
+            "pending_views": total_views,
+            "active_workers": 0,
+            "start_time": time.time(),
+            "results": [],
+            "errors": []
+        }
+        return cls._jobs[job_id]
+
+    @classmethod
+    def get_job(cls, job_id):
+        return cls._jobs.get(job_id)
+
+    @classmethod
+    def update_progress(cls, job_id, result):
+        job = cls._jobs.get(job_id)
+        if not job: return
+        job["results"].append(result)
+        job["pending_views"] -= 1
+        if result.get("success"):
+            job["completed_views"] += 1
+        else:
+            job["failed_views"] += 1
+            if result.get("error"):
+                job["errors"].append(result["error"])
+        
+        if job["pending_views"] == 0:
+            job["status"] = "COMPLETED"
+
+    @classmethod
+    def update_active_workers(cls, job_id, delta):
+        job = cls._jobs.get(job_id)
+        if job:
+            job["active_workers"] += delta
+
+
 class ViewDistributor:
     """
     Distribuye vistas equitativamente entre los videos.
@@ -250,38 +297,60 @@ class ViewDistributor:
     def __init__(self, session_manager: SessionManager):
         self.sessions = session_manager
 
-    async def distribute_views(self, videos: list[dict], total_views: int):
+    async def distribute_views(self, videos: list[dict], total_views: int, job_id: str = None, time_limit_minutes: float = None, concurrency: int = None):
         """
         Distribuye 'total_views' vistas entre los videos.
         
         Args:
-            videos: Lista de videos con id, title, url
+            videos: Lista de videos con id, title, url y opcionalmente 'weight'
             total_views: Número total de vistas a generar
+            job_id: ID para reportar a JobManager
+            time_limit_minutes: Límite de tiempo en minutos
+            concurrency: Número de workers paralelos
         """
         available_sessions = self.sessions.list_sessions()
         valid_sessions = [s for s in available_sessions if s["has_cookies"]]
 
         if not valid_sessions:
             print("❌ No sessions available. Import cookies first.")
-            return
+            if job_id:
+                job = JobManager.get_job(job_id)
+                if job: job["status"] = "FAILED"
+            return []
+
+        if not job_id:
+            job_id = uuid.uuid4().hex[:8]
+            JobManager.create_job(job_id, total_views)
 
         print(f"\n{'='*50}")
-        print(f"📊 DISTRIBUCIÓN DE VISTAS")
+        print(f"📊 DISTRIBUCIÓN DE VISTAS (Job: {job_id})")
         print(f"   Sessions: {len(valid_sessions)}")
         print(f"   {total_views} visits to distribute")
         print(f"   {len(videos)} videos available")
         print(f"{'='*50}\n")
 
-        # Estrategia: asignar sesiones a videos rotativamente
-        # Cada sesión ve 1 video (parece más natural)
+        # Estrategia proporcional (si hay weights) o equitativa
         assigned = []
+        has_weights = all("weight" in v for v in videos)
+        
+        if has_weights:
+            total_weight = sum(v.get("weight", 1) for v in videos)
+            counts = [int(total_views * (v.get("weight", 1) / total_weight)) for v in videos]
+            # Ajustar redondeos
+            while sum(counts) < total_views:
+                counts[0] += 1
+            
+            video_list = []
+            for v, c in zip(videos, counts):
+                video_list.extend([v] * c)
+            random.shuffle(video_list)
+        else:
+            video_list = [videos[i % len(videos)] for i in range(total_views)]
+
+        # Asignar sesiones
         session_idx = 0
-        video_idx = 0
-
-        for i in range(total_views):
+        for i, video in enumerate(video_list):
             session = valid_sessions[session_idx % len(valid_sessions)]
-            video = videos[video_idx % len(videos)]
-
             assigned.append({
                 "view_id": i + 1,
                 "session": session["id"],
@@ -289,32 +358,67 @@ class ViewDistributor:
                 "video_id": video["id"],
                 "video_title": video["title"][:50],
                 "video_url": video["url"],
+                "job_id": job_id
             })
-
             session_idx += 1
-            if session_idx % len(valid_sessions) == 0:
-                video_idx += 1
 
-        # Ejecutar vistas
-        print("Executing views...")
-        results = []
+        # Configurar Concurrencia
+        if not concurrency:
+            if time_limit_minutes:
+                # Cada vista toma aprox 60s
+                concurrency = max(1, int((total_views * 1.0) / time_limit_minutes) + 1)
+            else:
+                concurrency = 3 # default 3 workers
 
-        for assignment in assigned:
-            print(f"\n  [{assignment['view_id']}/{total_views}] "
-                  f"{assignment['session']} → {assignment['video_title']}")
+        concurrency = min(concurrency, total_views)
+        
+        print(f"🚀 Iniciando {concurrency} workers concurrentes...")
+        
+        queue = asyncio.Queue()
+        for a in assigned:
+            queue.put_nowait(a)
 
-            result = await self._execute_view(assignment)
-            results.append(result)
+        async def worker():
+            while True:
+                try:
+                    assignment = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                
+                JobManager.update_active_workers(job_id, 1)
+                try:
+                    print(f"\n  [{assignment['view_id']}/{total_views}] {assignment['session']} → {assignment['video_title']}")
+                    result = await self._execute_view(assignment)
+                    JobManager.update_progress(job_id, result)
+                except Exception as e:
+                    JobManager.update_progress(job_id, {"success": False, "error": str(e), "view_id": assignment["view_id"], "watch_time": 0})
+                finally:
+                    JobManager.update_active_workers(job_id, -1)
+                    queue.task_done()
 
-        # Resumen
-        passed = sum(1 for r in results if r["success"])
-        failed = sum(1 for r in results if not r["success"])
+        workers = []
+        for i in range(concurrency):
+            # REQUERIMIENTO QA: "cada worker debe iniciar un segundo despues del anterior"
+            if i > 0:
+                await asyncio.sleep(1.0)
+            task = asyncio.create_task(worker())
+            workers.append(task)
+            
+        await asyncio.gather(*workers)
+        
+        job = JobManager.get_job(job_id)
+        if job:
+            passed = job["completed_views"]
+            failed = job["failed_views"]
+            results = job["results"]
+        else:
+            passed = failed = 0
+            results = []
 
         print(f"\n{'='*50}")
-        print(f"📊 RESULTADOS")
+        print(f"📊 RESULTADOS (Job: {job_id})")
         print(f"   Exitosas: {passed}")
         print(f"   Fallidas: {failed}")
-        print(f"   Watch time total: {sum(r['watch_time'] for r in results):.0f}s")
         print(f"{'='*50}")
 
         return results
