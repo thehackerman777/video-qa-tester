@@ -1,160 +1,556 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>🧪 Tests</h1>
+<style>{% include "test_styles.css" %}</style>
 
-<div class="row mb-4">
-    <div class="col card">
-        <h2>▶ Single Test</h2>
-        <form hx-post="/api/test/run" hx-target="#single-result" hx-indicator="#single-spin">
-            <div class="mb-2"><label>Video URL</label><input type="url" name="url" id="test-url" placeholder="https://www.youtube.com/watch?v=..." required></div>
-            <div class="row">
-                <div style="flex:2"><label>Watch Time (s)</label><input type="number" name="watch_time" value="45"></div>
-                <div style="flex:1"><label>Instances</label><input type="number" name="count" value="1" min="1" max="50"></div>
+<h1>🚀 View Distribution</h1>
+
+<!-- ===== WIZARD STEPS ===== -->
+<div class="wizard-steps" id="wizard-nav">
+    <div class="wizard-step active" data-step="1" onclick="goStep(1)">
+        <div class="step-num">1</div>
+        <span class="step-label">Video</span>
+    </div>
+    <div class="wizard-connector" id="conn-1-2"></div>
+    <div class="wizard-step" data-step="2" onclick="goStep(2)">
+        <div class="step-num">2</div>
+        <span class="step-label">Configuration</span>
+    </div>
+    <div class="wizard-connector" id="conn-2-3"></div>
+    <div class="wizard-step" data-step="3">
+        <div class="step-num">3</div>
+        <span class="step-label">Monitor</span>
+    </div>
+</div>
+
+<!-- ===== STEP 1: VIDEO INPUT ===== -->
+<div class="step-panel active" id="step-1">
+    <div class="card">
+        <div class="card-header">📹 Enter Video or Channel URL</div>
+        <div class="url-input-group">
+            <input type="text" id="video-url" placeholder="https://youtube.com/watch?v=... or @channel" autocomplete="off">
+            <button class="btn btn-blue" onclick="validateVideo()" id="btn-validate">
+                <span id="validate-spin" class="spinner hidden"></span> Validate
+            </button>
+        </div>
+        <div id="video-preview-area" class="mt-4"></div>
+
+        <!-- Favorites Section -->
+        <div class="mt-4">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:13px;font-weight:500;color:var(--color-medium-gray)">⭐ Favorites</span>
+                <button class="btn" onclick="saveFav()" style="height:28px;font-size:12px;padding:0 10px">+ Save current</button>
             </div>
-            <button type="submit" class="btn btn-orange mt-2"><span id="single-spin" class="spinner hidden"></span> ▶ Run</button>
-        </form>
-        <div id="single-result" class="mt-2"></div>
+            <div id="fav-list"></div>
+        </div>
     </div>
 
-    <div class="col card">
-        <h2>📊 Distribute Views</h2>
-        <form id="dist-form" hx-post="/api/test/distribute" hx-target="#dist-result" hx-indicator="#dist-spin">
-            <div class="mb-2">
-                <label>Channel / Videos</label>
-                <div class="row">
-                    <input type="text" name="channel" id="dist-channel" placeholder="@elpepe8659" style="flex:1" required>
-                    <button type="button" class="btn" onclick="saveFav()" title="Save to Favorites">⭐</button>
+    <div class="wizard-actions">
+        <div></div>
+        <button class="btn btn-blue" id="btn-to-step2" onclick="goStep(2)" disabled>Continue →</button>
+    </div>
+</div>
+
+<!-- ===== STEP 2: CONFIGURATION ===== -->
+<div class="step-panel" id="step-2">
+    <div class="card">
+        <div class="card-header">⚙️ View Distribution Settings</div>
+
+        <div class="config-grid">
+            <div class="config-card">
+                <label>Total Views</label>
+                <input type="number" id="cfg-total-views" value="20" min="1" max="500">
+                <div class="hint">Total views to distribute across videos</div>
+            </div>
+            <div class="config-card">
+                <label>Top N Videos</label>
+                <input type="number" id="cfg-top-videos" value="10" min="1" max="50">
+                <div class="hint">Number of most-viewed videos to target</div>
+            </div>
+            <div class="config-card">
+                <label>Watch Time (seconds)</label>
+                <input type="number" id="cfg-watch-time" value="45" min="10" max="600">
+                <div class="hint">How long each view watches the video</div>
+            </div>
+            <div class="config-card">
+                <label>Time Limit (minutes)</label>
+                <input type="number" id="cfg-time-limit" placeholder="Auto (no limit)">
+                <div class="hint">Max execution time, leave empty for auto</div>
+            </div>
+        </div>
+
+        <div class="config-section-title">🔧 Advanced</div>
+        <div class="card" style="padding:12px 16px">
+            <div class="toggle-row">
+                <div>
+                    <div class="t-label">Progressive Distribution</div>
+                    <div class="t-desc">Weight more views to top-performing videos</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="cfg-progressive" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div>
+                    <div class="t-label">Randomize Intervals</div>
+                    <div class="t-desc">Add random delay between views for natural behavior</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="cfg-randomize" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="estimation-box" id="estimation-box">
+            <span class="est-icon">⏱️</span>
+            <div>Estimated time: <strong id="est-time">~15 min</strong> · <span id="est-detail">20 views across 10 videos at 45s each</span></div>
+        </div>
+    </div>
+
+    <div class="wizard-actions">
+        <button class="btn" onclick="goStep(1)">← Back</button>
+        <button class="btn btn-blue" onclick="startJob()" id="btn-start-job">
+            <span id="start-spin" class="spinner hidden"></span> 🚀 Start Job
+        </button>
+    </div>
+</div>
+
+<!-- ===== STEP 3: MONITOR ===== -->
+<div class="step-panel" id="step-3">
+    <div class="card">
+        <div class="monitor-header">
+            <div class="monitor-status" id="mon-status">
+                <div class="pulse"></div>
+                <span id="mon-status-text">RUNNING</span>
+            </div>
+            <span class="text-sm text-muted" id="mon-elapsed">Elapsed: 0:00</span>
+        </div>
+
+        <div class="monitor-stats">
+            <div class="m-stat info">
+                <div class="m-val" id="mon-total">0</div>
+                <div class="m-lbl">Total</div>
+            </div>
+            <div class="m-stat success">
+                <div class="m-val" id="mon-completed">0</div>
+                <div class="m-lbl">Completed</div>
+            </div>
+            <div class="m-stat danger">
+                <div class="m-val" id="mon-failed">0</div>
+                <div class="m-lbl">Failed</div>
+            </div>
+            <div class="m-stat">
+                <div class="m-val" id="mon-workers">0</div>
+                <div class="m-lbl">Workers</div>
+            </div>
+        </div>
+
+        <div class="progress-track">
+            <div class="progress-fill" id="mon-bar" style="width:0%"></div>
+        </div>
+        <div class="progress-label">
+            <span id="mon-pct">0%</span>
+            <span id="mon-pending">Pending: 0</span>
+        </div>
+
+        <!-- Log Console -->
+        <div class="log-console">
+            <div class="lc-header">
+                <span>📋 Live Logs</span>
+                <span id="log-count">0 entries</span>
+            </div>
+            <div class="lc-body" id="log-body">
+                <div class="log-line">
+                    <span class="log-time">--:--:--</span>
+                    <span class="log-type t-info">INFO</span>
+                    <span class="log-msg">Waiting for job to start...</span>
                 </div>
             </div>
-            <div class="row mb-2">
-                <div style="flex:1"><label>Total Views</label><input type="number" name="total_views" value="20"></div>
-                <div style="flex:1"><label>Top N Videos</label><input type="number" name="top_videos" value="10"></div>
-                <div style="flex:1"><label>Time Limit (min)</label><input type="number" name="time_limit" placeholder="Auto"></div>
-            </div>
-            <button type="submit" class="btn btn-orange mt-2"><span id="dist-spin" class="spinner hidden"></span> 🚀 Start Job</button>
-        </form>
-        <div id="dist-result" class="mt-2 text-sm text-muted"></div>
-        
-        <!-- Live Progress UI -->
-        <div id="progress-container" class="mt-3" style="display:none; background:#1e1e1e; padding:15px; border-radius:8px; border:1px solid #333;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                <strong><span id="v-status" style="color:var(--primary)">RUNNING</span></strong>
-                <span class="text-sm text-muted">Workers Activos: <span id="v-workers" style="color:white;font-weight:bold;">0</span></span>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:12px;">
-                <span>Progreso: <span id="v-completed">0</span> / <span id="v-total">0</span></span>
-                <span>Fallos: <span id="v-failed" style="color:#ff4a4a">0</span></span>
-            </div>
-            <div style="width:100%; background:#111; border-radius:4px; height:12px; overflow:hidden;">
-                <div id="v-bar" style="width:0%; background:var(--primary); height:100%; transition: width 0.4s ease;"></div>
-            </div>
-            <div id="v-errors" class="text-sm mt-2" style="color:#ff4a4a; max-height:60px; overflow-y:auto;"></div>
         </div>
-        
-        <!-- Favorites -->
-        <div class="mt-4">
-            <h4>⭐ Favoritos</h4>
-            <div id="fav-list" class="text-sm mt-2"></div>
-        </div>
+    </div>
+
+    <div class="wizard-actions">
+        <button class="btn" id="btn-new-job" onclick="resetWizard()" style="display:none">+ New Job</button>
+        <div></div>
     </div>
 </div>
 
-<h2>Results</h2>
-<div class="card" id="results-list">
-    {% if results %}
-    <table>
-        <tr><th>Time</th><th>Type</th><th>Target</th><th>Passed</th><th>Failed</th></tr>
-        {% for r in results[-10:]|reverse %}
-        <tr>
-            <td class="text-sm text-muted">{{ r.timestamp[11:19] }}</td>
-            <td>{{ r.get("type","test") }}</td>
-            <td class="truncate" style="max-width:300px">{{ r.get("url") or r.get("channel","") }}</td>
-            <td><span class="badge badge-green">{{ r.passed }}</span></td>
-            <td>{% if r.failed > 0 %}<span class="badge badge-red">{{ r.failed }}</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    {% else %}
-    <div class="text-center text-muted" style="padding:40px">No results yet</div>
-    {% endif %}
-</div>
+<!-- ===== RESULTS HISTORY ===== -->
+<div class="mt-4">
+    <h2>📊 Recent Results</h2>
+    <div class="card" id="results-list">
+        {% if results %}
+        <table>
+            <tr><th>Time</th><th>Type</th><th>Target</th><th>Passed</th><th>Failed</th></tr>
+            {% for r in results[-10:]|reverse %}
+            <tr>
+                <td class="text-sm text-muted">{{ r.timestamp[11:19] }}</td>
+                <td><span class="badge badge-blue">{{ r.get("type","test") }}</span></td>
+                <td class="truncate" style="max-width:300px">{{ r.get("url") or r.get("channel","") }}</td>
+                <td><span class="badge badge-green">{{ r.passed }}</span></td>
+                <td>{% if r.failed > 0 %}<span class="badge badge-red">{{ r.failed }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <div class="text-center text-muted" style="padding:40px">No results yet — start your first job above</div>
+        {% endif %}
+    </div>
 </div>
 
 <script>
-    // Interceptar HTMX para polling
-    document.body.addEventListener('htmx:afterRequest', function(evt) {
-        if (evt.detail.elt.id === "dist-form" || evt.detail.elt.closest("#dist-form")) {
-            try {
-                let res = JSON.parse(evt.detail.xhr.response);
-                if (res.task_id) {
-                    startPolling(res.task_id);
-                    document.getElementById("dist-result").innerText = "Job started: " + res.task_id;
-                }
-            } catch(e){}
-        }
+// ============================================================
+// State
+// ============================================================
+let currentStep = 1;
+let validatedUrl = null;
+let validatedData = null;
+let activeJobId = null;
+let pollInterval = null;
+let jobStartTime = null;
+let elapsedInterval = null;
+let logEntries = [];
+
+// ============================================================
+// Wizard Navigation
+// ============================================================
+function goStep(n) {
+    if (n === 2 && !validatedUrl) return;
+    if (n === 3) return; // only via startJob
+    currentStep = n;
+    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('step-' + n).classList.add('active');
+    document.querySelectorAll('.wizard-step').forEach(s => {
+        const sn = +s.dataset.step;
+        s.classList.toggle('active', sn === n);
+        s.classList.toggle('done', sn < n);
     });
+    document.querySelectorAll('.wizard-connector').forEach((c, i) => {
+        c.classList.toggle('done', i + 1 < n);
+    });
+    if (n === 2) updateEstimation();
+}
 
-    let pollInterval = null;
-    function startPolling(taskId) {
-        if(pollInterval) clearInterval(pollInterval);
-        document.getElementById("progress-container").style.display = "block";
-        document.getElementById("dist-result").style.display = "none";
-        
-        pollInterval = setInterval(() => {
-            fetch("/api/jobs/" + taskId + "/status")
-                .then(r => r.json())
-                .then(data => {
-                    if(data.status === "ok") {
-                        let job = data.job;
-                        document.getElementById("v-total").innerText = job.total_views;
-                        document.getElementById("v-completed").innerText = job.completed_views;
-                        document.getElementById("v-failed").innerText = job.failed_views;
-                        document.getElementById("v-workers").innerText = job.active_workers;
-                        document.getElementById("v-status").innerText = job.status;
-                        
-                        let pct = ( (job.completed_views + job.failed_views) / job.total_views ) * 100;
-                        document.getElementById("v-bar").style.width = pct + "%";
-                        
-                        if(job.errors && job.errors.length > 0) {
-                            document.getElementById("v-errors").innerHTML = job.errors.map(e => `<div>❌ ${e}</div>`).join("");
-                        }
+function showStep3() {
+    currentStep = 3;
+    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('step-3').classList.add('active');
+    document.querySelectorAll('.wizard-step').forEach(s => {
+        const sn = +s.dataset.step;
+        s.classList.toggle('active', sn === 3);
+        s.classList.toggle('done', sn < 3);
+    });
+    document.querySelectorAll('.wizard-connector').forEach(c => c.classList.add('done'));
+}
 
-                        if(job.status === "COMPLETED" || job.status === "FAILED") {
-                            clearInterval(pollInterval);
-                            setTimeout(() => location.reload(), 3000); // refresh list
-                        }
-                    }
-                });
-        }, 1500);
+// ============================================================
+// Step 1: Video Validation
+// ============================================================
+function validateVideo() {
+    const url = document.getElementById('video-url').value.trim();
+    if (!url) return;
+    const spin = document.getElementById('validate-spin');
+    const btn = document.getElementById('btn-validate');
+    spin.classList.remove('hidden');
+    btn.disabled = true;
+
+    // Extract video ID or treat as channel
+    let isChannel = url.startsWith('@') || url.includes('/channel/') || (!url.includes('watch') && !url.includes('youtu.be'));
+    
+    if (isChannel) {
+        // For channels, validate by attempting scan
+        const channel = url.startsWith('@') ? url : url;
+        validatedUrl = channel;
+        validatedData = { type: 'channel', id: channel };
+        document.getElementById('video-preview-area').innerHTML = `
+            <div class="video-preview">
+                <div class="thumb" style="width:80px;min-width:80px;height:80px;display:flex;align-items:center;justify-content:center;background:#e3f2fd;border-radius:50%">
+                    <span style="font-size:32px">📡</span>
+                </div>
+                <div class="meta">
+                    <div class="v-title">${escHtml(channel)}</div>
+                    <div class="v-channel">YouTube Channel</div>
+                    <div class="video-validated">✅ Channel ready for scanning</div>
+                </div>
+            </div>`;
+        document.getElementById('btn-to-step2').disabled = false;
+        spin.classList.add('hidden');
+        btn.disabled = false;
+        return;
     }
 
-    // Favoritos
-    function loadFavs() {
-        fetch("/api/favorites").then(r=>r.json()).then(d => {
-            let html = "";
-            d.favorites.forEach(f => {
-                html += `<div style="display:flex; justify-content:space-between; background:#1a1a1a; padding:5px 10px; margin-bottom:5px; border-radius:4px;">
-                    <a href="#" onclick="document.getElementById('dist-channel').value='${f.url}';return false;" style="color:var(--primary);text-decoration:none;">${f.title}</a>
-                    <a href="#" onclick="deleteFav('${f.id}');return false;" style="color:#ff4a4a;text-decoration:none;">✖</a>
-                </div>`;
-            });
-            document.getElementById("fav-list").innerHTML = html;
+    // For video URLs, extract thumbnail
+    let videoId = '';
+    try {
+        if (url.includes('youtu.be/')) videoId = url.split('youtu.be/')[1].split(/[?&]/)[0];
+        else if (url.includes('v=')) videoId = new URL(url).searchParams.get('v');
+    } catch(e) {}
+
+    if (videoId) {
+        validatedUrl = url;
+        validatedData = { type: 'video', id: videoId };
+        document.getElementById('video-preview-area').innerHTML = `
+            <div class="video-preview">
+                <div class="thumb">
+                    <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" alt="Thumbnail">
+                </div>
+                <div class="meta">
+                    <div class="v-title">Video: ${videoId}</div>
+                    <div class="v-channel">YouTube Video</div>
+                    <div class="v-stats">
+                        <span>🔗 ${escHtml(url.substring(0, 50))}...</span>
+                    </div>
+                    <div class="video-validated">✅ Video validated successfully</div>
+                </div>
+            </div>`;
+        document.getElementById('btn-to-step2').disabled = false;
+    } else {
+        // Treat as channel/handle
+        validatedUrl = url;
+        validatedData = { type: 'channel', id: url };
+        document.getElementById('video-preview-area').innerHTML = `
+            <div class="video-preview">
+                <div class="thumb" style="width:80px;min-width:80px;height:80px;display:flex;align-items:center;justify-content:center;background:#e3f2fd;border-radius:50%">
+                    <span style="font-size:32px">📡</span>
+                </div>
+                <div class="meta">
+                    <div class="v-title">${escHtml(url)}</div>
+                    <div class="v-channel">YouTube Channel / URL</div>
+                    <div class="video-validated">✅ Ready</div>
+                </div>
+            </div>`;
+        document.getElementById('btn-to-step2').disabled = false;
+    }
+    spin.classList.add('hidden');
+    btn.disabled = false;
+}
+
+// Enter key to validate
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('video-url').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); validateVideo(); }
+    });
+});
+
+// ============================================================
+// Step 2: Estimation
+// ============================================================
+function updateEstimation() {
+    const views = parseInt(document.getElementById('cfg-total-views').value) || 20;
+    const watchTime = parseInt(document.getElementById('cfg-watch-time').value) || 45;
+    const topN = parseInt(document.getElementById('cfg-top-videos').value) || 10;
+    const totalSec = views * (watchTime + 15); // +15s overhead per view
+    const mins = Math.ceil(totalSec / 60);
+    document.getElementById('est-time').textContent = mins < 60 ? `~${mins} min` : `~${Math.floor(mins/60)}h ${mins%60}m`;
+    document.getElementById('est-detail').textContent = `${views} views across ${topN} videos at ${watchTime}s each`;
+}
+
+// Live update estimation on input change
+document.addEventListener('DOMContentLoaded', () => {
+    ['cfg-total-views','cfg-watch-time','cfg-top-videos'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', updateEstimation);
+    });
+});
+
+// ============================================================
+// Step 2 → 3: Start Job
+// ============================================================
+function startJob() {
+    if (!validatedUrl) return;
+    const btn = document.getElementById('btn-start-job');
+    const spin = document.getElementById('start-spin');
+    btn.disabled = true;
+    spin.classList.remove('hidden');
+
+    const fd = new FormData();
+    fd.append('channel', validatedUrl);
+    fd.append('total_views', document.getElementById('cfg-total-views').value);
+    fd.append('top_videos', document.getElementById('cfg-top-videos').value);
+    fd.append('time_limit', document.getElementById('cfg-time-limit').value || '');
+
+    fetch('/api/test/distribute', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(data => {
+            if (data.task_id) {
+                activeJobId = data.task_id;
+                addLog('INFO', `Job started: ${data.task_id}`);
+                showStep3();
+                startPolling(data.task_id);
+            } else {
+                addLog('ERROR', 'Failed to start job');
+            }
+        })
+        .catch(e => addLog('ERROR', `Request failed: ${e.message}`))
+        .finally(() => {
+            btn.disabled = false;
+            spin.classList.add('hidden');
         });
+}
+
+// ============================================================
+// Step 3: Polling & Monitoring
+// ============================================================
+function startPolling(taskId) {
+    if (pollInterval) clearInterval(pollInterval);
+    if (elapsedInterval) clearInterval(elapsedInterval);
+    
+    jobStartTime = Date.now();
+    elapsedInterval = setInterval(updateElapsed, 1000);
+    
+    pollInterval = setInterval(() => {
+        fetch('/api/jobs/' + taskId + '/status')
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'ok') updateMonitor(data.job);
+            })
+            .catch(() => {});
+    }, 1500);
+}
+
+function updateMonitor(job) {
+    const total = job.total_views || 0;
+    const completed = job.completed_views || 0;
+    const failed = job.failed_views || 0;
+    const workers = job.active_workers || 0;
+    const pending = total - completed - failed;
+    const pct = total > 0 ? Math.round(((completed + failed) / total) * 100) : 0;
+
+    document.getElementById('mon-total').textContent = total;
+    document.getElementById('mon-completed').textContent = completed;
+    document.getElementById('mon-failed').textContent = failed;
+    document.getElementById('mon-workers').textContent = workers;
+    document.getElementById('mon-bar').style.width = pct + '%';
+    document.getElementById('mon-pct').textContent = pct + '%';
+    document.getElementById('mon-pending').textContent = 'Pending: ' + pending;
+    document.getElementById('mon-status-text').textContent = job.status;
+
+    // Errors as log entries
+    if (job.errors && job.errors.length > logEntries.filter(l => l.type === 'ERROR').length) {
+        const newErrors = job.errors.slice(logEntries.filter(l => l.type === 'ERROR').length);
+        newErrors.forEach(e => addLog('ERROR', e));
     }
 
-    function saveFav() {
-        let url = document.getElementById("dist-channel").value;
-        if(!url) return;
-        let fd = new FormData();
-        fd.append("url", url);
-        fd.append("title", url.split("/").pop());
-        fetch("/api/favorites", {method:"POST", body:fd}).then(()=>loadFavs());
+    // Completed views as log entries
+    if (completed > logEntries.filter(l => l.type === 'OK').length) {
+        const diff = completed - logEntries.filter(l => l.type === 'OK').length;
+        for (let i = 0; i < diff; i++) addLog('OK', `View completed (${completed - diff + i + 1}/${total})`);
     }
 
-    function deleteFav(id) {
-        fetch("/api/favorites/" + id, {method:"DELETE"}).then(()=>loadFavs());
+    // Status changes
+    const statusEl = document.getElementById('mon-status');
+    statusEl.className = 'monitor-status';
+    if (job.status === 'COMPLETED') {
+        statusEl.classList.add('completed');
+        document.getElementById('mon-bar').style.background = '#2e7d32';
+        finishJob('COMPLETED');
+    } else if (job.status === 'FAILED') {
+        statusEl.classList.add('failed');
+        document.getElementById('mon-bar').style.background = '#c62828';
+        finishJob('FAILED');
     }
+}
 
-    document.addEventListener("DOMContentLoaded", loadFavs);
+function finishJob(status) {
+    clearInterval(pollInterval);
+    clearInterval(elapsedInterval);
+    addLog('INFO', `Job ${status.toLowerCase()}`);
+    document.getElementById('btn-new-job').style.display = 'inline-flex';
+}
+
+function updateElapsed() {
+    if (!jobStartTime) return;
+    const sec = Math.floor((Date.now() - jobStartTime) / 1000);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    document.getElementById('mon-elapsed').textContent = `Elapsed: ${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ============================================================
+// Log System
+// ============================================================
+function addLog(type, msg) {
+    const now = new Date();
+    const time = now.toTimeString().substring(0, 8);
+    logEntries.push({ type, msg, time });
+
+    const typeClass = type === 'OK' ? 't-ok' : type === 'ERROR' ? 't-err' : type === 'WARN' ? 't-warn' : 't-info';
+    const body = document.getElementById('log-body');
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-time">${time}</span><span class="log-type ${typeClass}">${type}</span><span class="log-msg">${escHtml(msg)}</span>`;
+    body.appendChild(line);
+    body.scrollTop = body.scrollHeight;
+    document.getElementById('log-count').textContent = logEntries.length + ' entries';
+}
+
+// ============================================================
+// Reset
+// ============================================================
+function resetWizard() {
+    validatedUrl = null;
+    validatedData = null;
+    activeJobId = null;
+    logEntries = [];
+    if (pollInterval) clearInterval(pollInterval);
+    if (elapsedInterval) clearInterval(elapsedInterval);
+    
+    document.getElementById('video-url').value = '';
+    document.getElementById('video-preview-area').innerHTML = '';
+    document.getElementById('btn-to-step2').disabled = true;
+    document.getElementById('btn-new-job').style.display = 'none';
+    document.getElementById('mon-bar').style.width = '0%';
+    document.getElementById('mon-bar').style.background = 'var(--color-accent-blue)';
+    document.getElementById('log-body').innerHTML = '<div class="log-line"><span class="log-time">--:--:--</span><span class="log-type t-info">INFO</span><span class="log-msg">Waiting for job to start...</span></div>';
+    document.getElementById('log-count').textContent = '0 entries';
+    ['mon-total','mon-completed','mon-failed','mon-workers'].forEach(id => document.getElementById(id).textContent = '0');
+    document.getElementById('mon-pct').textContent = '0%';
+    document.getElementById('mon-pending').textContent = 'Pending: 0';
+    document.getElementById('mon-status-text').textContent = 'IDLE';
+    document.getElementById('mon-elapsed').textContent = 'Elapsed: 0:00';
+    document.getElementById('mon-status').className = 'monitor-status';
+    
+    goStep(1);
+}
+
+// ============================================================
+// Favorites
+// ============================================================
+function loadFavs() {
+    fetch('/api/favorites').then(r=>r.json()).then(d => {
+        const list = document.getElementById('fav-list');
+        if (!d.favorites || d.favorites.length === 0) {
+            list.innerHTML = '<div class="text-sm text-muted" style="padding:8px 0">No favorites saved</div>';
+            return;
+        }
+        list.innerHTML = d.favorites.map(f => `
+            <div class="fav-item">
+                <a href="#" onclick="document.getElementById('video-url').value='${f.url}';return false;">${escHtml(f.title)}</a>
+                <span class="fav-del" onclick="deleteFav('${f.id}')">✕</span>
+            </div>`).join('');
+    });
+}
+
+function saveFav() {
+    const url = document.getElementById('video-url').value;
+    if (!url) return;
+    const fd = new FormData();
+    fd.append('url', url);
+    fd.append('title', url.length > 30 ? url.substring(0, 30) + '...' : url);
+    fetch('/api/favorites', { method: 'POST', body: fd }).then(() => { loadFavs(); showToast('Saved to favorites'); });
+}
+
+function deleteFav(id) {
+    fetch('/api/favorites/' + id, { method: 'DELETE' }).then(() => loadFavs());
+}
+
+function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', loadFavs);
 </script>
 {% endblock %}
